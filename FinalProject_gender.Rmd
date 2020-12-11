@@ -131,6 +131,8 @@ colnames(nlsy) <- c("PSTRAN_GPA.01_PSTR",
 ### THIS IS DONE ONLY FOR ILLUSTRATIVE PURPOSES
 ### DO NOT TAKE THIS APPROACH WITHOUT CAREFUL JUSTIFICATION
 #nlsy[nlsy < 0]  <- NA
+# use mutate if/else
+
 
 #Create a data dictionary that helps with sorting and finding information on data columns
 # encoded.val <- code.dict[legible.names == "Legiblename",2]
@@ -140,25 +142,21 @@ code.dict <- data.frame(legible.names,encoded.names)
 
 #### Data Clean & Recoding
 ```{r}
-#Recode numeric codes in gender column to match gender name
-nlsy <- nlsy %>%
-  mutate(sex = gsub(1, "MALE",sex), sex = gsub(2,"FEMALE",sex))
+nlsy <- as_tibble(nlsy) %>%
+  rename(cocaine_use = 'YSAQ-372CC_2011',
+         smokes = 'YSAQ-360C_2011',
+         drinks = 'YSAQ-364D_2011') %>%
+  mutate(marital_status = recode_factor(CV_MARSTAT_COLLAPSED_2017, `0`="NEVER-MARRIED", `1` = "MARRIED", `2` = "SEPARATED", `3` = "DIVORCED", `4` = "WIDOWED", `-5` = "UNKNOWN", `-3` = "UNKNOWN")) %>%
+  mutate(sex = recode_factor(sex, `1`="MALE", `2`="FEMALE")) %>%
+  mutate(race = recode_factor(race, `1` = "BLACK", `2` = "HISPANIC", `3` = "MIXED-RACE (NON-HISP.)", `4` = "NON-BLACK/NON-HISPANIC")) %>%
+  mutate_at(c("cocaine_use", "smokes", "drinks"), ~ recode_factor(.x, `0` = "NO", `1` = "YES", .default = "UNKNOWN"))
 
-#Recode numeric codes in race column to match race name
-nlsy <- nlsy %>%
-  mutate(race = gsub(1,"BLACK",race), 
-         race = gsub(2,"HISPANIC",race),
-         race = gsub(3,"MIXED-RACE (NON-HISP.)",race),
-         race = gsub(4,"NON-BLACK/NON-HISPANIC",race))
-
-#Recode marital status
-
-nlsy <- nlsy %>%
-  mutate(CV_MARSTAT_COLLAPSED_2017 = gsub(0,"NEVER-MARRIED",CV_MARSTAT_COLLAPSED_2017), 
-         CV_MARSTAT_COLLAPSED_2017 = gsub(1,"MARRIED",CV_MARSTAT_COLLAPSED_2017),
-         CV_MARSTAT_COLLAPSED_2017 = gsub(2,"SEPARATED",CV_MARSTAT_COLLAPSED_2017),
-         CV_MARSTAT_COLLAPSED_2017 = gsub(3,"DIVORCED",CV_MARSTAT_COLLAPSED_2017),
-         CV_MARSTAT_COLLAPSED_2017 = gsub(4,"WIDOWED",CV_MARSTAT_COLLAPSED_2017))
+table(nlsy$sex)
+table(nlsy$race)
+table(nlsy$marital_status)
+table(nlsy$cocaine_use)
+table(nlsy$smokes)
+table(nlsy$drinks)
 
 ```
 #### Data Exploration
@@ -207,6 +205,202 @@ code.dict[encoded.names == "U1852400",1]
 
 ```
 
+
+```{r}
+#sum(total.income < 0) # total na values
+
+#nlsy[nlsy < 0]  <- NA
+
+###RACE, SEX, MARITAL STATUS
+income.data.gender <- nlsy %>%
+  group_by(sex) %>%
+ summarize(avg.income = mean(income))
+
+gap.data.gender.race <- nlsy %>% 
+  group_by(race) %>%
+  summarize(income.gap = mean(income[sex == "MALE"], na.rm = TRUE) -
+              mean(income[sex == "FEMALE"], na.rm = TRUE))
+
+gap.data.marital_stat <- nlsy %>%
+  group_by(marital_status) %>%
+ summarize(income.gap = mean(income[sex == "MALE"], na.rm = TRUE) -
+              mean(income[sex == "FEMALE"], na.rm = TRUE))
+
+### ALCOHOL, TOBACCO, HARD DRUGS(Cocaine)
+gap.data.gender.smokes <- nlsy %>% 
+  group_by(smokes) %>%
+  summarize(income.gap = mean(income[sex == "MALE"], na.rm = TRUE) -
+              mean(income[sex == "FEMALE"], na.rm = TRUE))
+
+gap.data.gender.cocaine_use <- nlsy %>% 
+  group_by(cocaine_use) %>%
+  summarize(income.gap = mean(income[sex == "MALE"], na.rm = TRUE) -
+              mean(income[sex == "FEMALE"], na.rm = TRUE))
+
+gap.data.gender.drinks <- nlsy %>% 
+  group_by(drinks) %>%
+  summarize(income.gap = mean(income[sex == "MALE"], na.rm = TRUE) -
+              mean(income[sex == "FEMALE"], na.rm = TRUE))
+
+
+
+###RACE, SEX, MARITAL STATUS
+ggplot(data = income.data.gender, aes(x=sex, y=avg.income, fill=I("steelblue"))) + geom_bar(stat = "identity") +
+  xlab("Gender") +
+  ylab("Income") +
+  ggtitle("AVG Income of Men and Women") +
+  guides(fill = FALSE) #obvious gap between average income between men and women
+
+ggplot(data = gap.data.gender.race, aes(x=race, y=income.gap, fill=I("steelblue"))) + geom_bar(stat = "identity") +
+  xlab("Race") +
+  ylab("Income Gap($)") +
+  ggtitle("Income Gap between Men and Women, by Race") +
+  guides(fill = FALSE) +
+    theme(axis.text.x=element_text(angle = -15, vjust = 0)) #Significant gap between races
+
+ggplot(data = gap.data.marital_stat, aes(x=marital_status, y=income.gap, fill=I("steelblue"))) + geom_bar(stat = "identity") +
+  xlab("Marital Status") +
+  ylab("Income Gap($)") +
+  ggtitle("Income Gap between Men and Women, by Marital Status") +
+  guides(fill = FALSE) +
+    theme(axis.text.x=element_text(angle = -15, vjust = 0)) #Huge gap in income between married men and women
+
+### ALCOHOL, TOBACCO, HARD DRUGS(Cocaine)
+ggplot(data = gap.data.gender.smokes, aes(x=smokes, y=income.gap, fill=I("steelblue"))) + geom_bar(stat = "identity") +
+  xlab("Smokes") +
+  ylab("Income Gap($)") +
+  ggtitle("Income Gap between Men and Women, by Smokes") +
+  guides(fill = FALSE)
+
+ggplot(data = gap.data.gender.cocaine_use, aes(x=cocaine_use, y=income.gap, fill=I("steelblue"))) + geom_bar(stat = "identity") +
+  xlab("Cocaine Use") +
+  ylab("Income Gap($)") +
+  ggtitle("Income Gap between Men and Women, by Cocaine Use") +
+  guides(fill = FALSE)
+
+ggplot(data = gap.data.gender.drinks, aes(x=drinks, y=income.gap, fill=I("steelblue"))) + geom_bar(stat = "identity") +
+  xlab("Drinks") +
+  ylab("Income Gap($)") +
+  ggtitle("Income Gap between Men and Women, by Drinks") +
+  guides(fill = FALSE)
+
+```
+```
+U17180.00    [YEMP_INDCODE-2002.01]                         Survey Year: 2017
+  PRIMARY VARIABLE
+
+ 
+             YEMP, TYPE OF BUS OR INDUSTRY CODE (2002 CENSUS 4-DIGIT) 01 (ROS 
+             ITEM)
+ 
+UNIVERSE: R >= 14 has valid employer
+These are 2002 Census Industry Codes
+ 
+      43         170 TO 290: AGRICULTURE, FORESTRY AND FISHERIES
+      29         370 TO 490: MINING
+      32         570 TO 690: UTILITIES
+     391         770: CONSTRUCTION
+     493        1070 TO 3990: MANUFACTURING
+     127        4070 TO 4590: WHOLESALE TRADE
+     560        4670 TO 5790: RETAIL TRADE
+       0        5890: ARTS, ENTERTAINMENT AND RECREATION SERVICES
+     262        6070 TO 6390: TRANSPORTATION AND WAREHOUSING
+     107        6470 TO 6780: INFORMATION AND COMMUNICATION
+     392        6870 TO 7190: FINANCE, INSURANCE, AND REAL ESTATE
+     757        7270 TO 7790: PROFESSIONAL AND RELATED SERVICES
+    1355        7860 TO 8470: EDUCATIONAL, HEALTH, AND SOCIAL SERVICES
+     529        8560 TO 8690: ENTERTAINMENT, ACCOMODATIONS, AND FOOD SERVICES
+     237        8770 TO 9290: OTHER SERVICES
+     262        9370 TO 9590: PUBLIC ADMINISTRATION
+      13        9670 TO 9890: ACTIVE DUTY MILITARY
+     225        9950 TO 9990: ACS SPECIAL CODES
+  -------
+    5814
+ 
+Refusal(-1)            0
+Don't Know(-2)         0
+Invalid Skip(-3)      65
+TOTAL =========>    5879   VALID SKIP(-4)     855     NON-INTERVIEW(-5)    2250
+ 
+Min:            170        Max:           9990        Mean:              6609.4
+ 
+Hard Minimum: [0]
+Hard Maximum: [9999]
+```
+```{r}
+nlsy$`YEMP_INDCODE-2002.01_2017` <- cut(nlsy$`YEMP_INDCODE-2002.01_2017`, breaks = c(-5,0,169,290,369,490,569,690,769,770,1069,3990,4069,4590,4669,5790,5889,5890,6069,6390,6469,6780,6869,7190,7269,7790,7859,8470,8559,8690,8769,9290,9369,9590,9669,9890,9949,9990), labels = c("UNKNOWN","NA","AGRICULTURE, FORESTRY, FISHING","NA","MINING","NA","UTILITIES","NA","CONSTRUCTION","NA","MANUFACTURING","NA", "WHOLESALE TRADE","NA","RETAIL TRADE","NA","ENTERTAINMENT","NA","TRANSPORTATION AND wHAREHOUSING","NA","INFORMATION AND COMMUNICATION", "NA", "FINANCE, INSURANCE, AND REAL ESTATE","NA","PROFESSIONAL AND RELATED SERVICES", "NA", "EDUCATIONAL, HEALTH, AND SOCIAL SERVICES","NA","ENTERTAINMENT, ACCOMODATIONS, AND FOOD SERVICES", "NA","OTHER SERVICES","NA","PUBLIC ADMINISTRATION","NA","ACTIVE DUTY MILITARY","NA","ACS SPECIAL CODES"),include.lowest = TRUE)
+#table(nlsy$`YEMP_INDCODE-2002.01_2017`)
+
+gap.data.gender.industry <- nlsy %>% 
+  group_by(`YEMP_INDCODE-2002.01_2017`) %>%
+  summarize(income.gap = mean(income[sex == "MALE"], na.rm = TRUE) -
+              mean(income[sex == "FEMALE"], na.rm = TRUE))
+
+ggplot(data = gap.data.gender.industry, aes(x=`YEMP_INDCODE-2002.01_2017`, y=income.gap, fill=I("steelblue"))) + geom_bar(stat = "identity") +
+  xlab("Industry") +
+  ylab("Income Gap($)") +
+  ggtitle("Income Gap between Men and Women, by Industry") +
+  guides(fill = FALSE) +
+  theme(axis.text.x=element_text(angle = -40, vjust = 0))
+```
+```
+R12002.00    [CV_BIO_MOM_AGE_YOUTH]                         Survey Year: 1997
+  PRIMARY VARIABLE
+
+ 
+             AGE OF BIO MOTHER WHEN R BORN
+ 
+Age of biological mother when respondent born.
+/* EXTREME RESPONSES REFLECT UNEDITED INTERVIEW DATA THAT WERE REPORTED DURING 
+THE SURVEY; RESEARCHERS MAY WANT TO EVALUATE THESE DATA BEFORE DRAWING 
+CONCLUSIONS. */
+ 
+       0           0
+       0           1 TO 4
+       0           5 TO 8
+      34           9 TO 14
+    1089          15 TO 19
+    2725          20 TO 24
+    2633          25 TO 29
+    1387          30 TO 34
+     435          35 TO 39
+      57          40 TO 44
+       8          45 TO 49
+       8          50 TO 99999999: 50+
+  -------
+    8376
+ 
+Refusal(-1)            0
+Don't Know(-2)         0
+Invalid Skip(-3)     608
+TOTAL =========>    8984   VALID SKIP(-4)       0     NON-INTERVIEW(-5)       0
+ 
+Min:             10        Max:            101        Mean:                25.5
+ 
+Hard Minimum: [0]
+Hard Maximum: [118]
+```
+```{r}
+nlsy$CV_BIO_MOM_AGE_YOUTH_1997 <- cut(nlsy$CV_BIO_MOM_AGE_YOUTH_1997, breaks = c(-Inf,0,20,30,40,50,60), labels = c("Unknown","Child/Teen","20s","30s","40s","50s+"))
+
+
+gap.data.AGE_MOM_YOUTH <- nlsy %>%
+  group_by(CV_BIO_MOM_AGE_YOUTH_1997) %>%
+ summarize(income.gap = mean(income[sex == "MALE"], na.rm = TRUE) -
+              mean(income[sex == "FEMALE"], na.rm = TRUE))
+
+ggplot(data = gap.data.AGE_MOM_YOUTH, aes(x=CV_BIO_MOM_AGE_YOUTH_1997, y=income.gap, fill=I("steelblue"))) + geom_bar(stat = "identity") +
+  xlab("Age of Mother at Birth of Child") +
+  ylab("Income Gap($)") +
+  ggtitle("Income Gap between Men and Women, by Age of Mother at Birth") +
+  guides(fill = FALSE)
+
+```
+
+
+```{r}
+table(nlsy$sex)
+```
 
 
 #### A note on missing values
