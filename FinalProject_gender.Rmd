@@ -10,6 +10,7 @@ output: html_document
 ```{r}
 library(tidyverse)
 library(knitr)
+library(ggplot2)
 ```
 
 
@@ -142,13 +143,35 @@ code.dict <- data.frame(legible.names,encoded.names)
 
 #### Data Clean & Recoding
 ```{r}
+#Rename and Recode Select Covariates
 nlsy <- as_tibble(nlsy) %>%
   rename(cocaine_use = 'YSAQ-372CC_2011',
          smokes = 'YSAQ-360C_2011',
-         drinks = 'YSAQ-364D_2011') %>%
-  mutate(marital_status = recode_factor(CV_MARSTAT_COLLAPSED_2017, `0`="NEVER-MARRIED", `1` = "MARRIED", `2` = "SEPARATED", `3` = "DIVORCED", `4` = "WIDOWED", `-5` = "UNKNOWN", `-3` = "UNKNOWN")) %>%
-  mutate(sex = recode_factor(sex, `1`="MALE", `2`="FEMALE")) %>%
-  mutate(race = recode_factor(race, `1` = "BLACK", `2` = "HISPANIC", `3` = "MIXED-RACE (NON-HISP.)", `4` = "NON-BLACK/NON-HISPANIC")) %>%
+         drinks = 'YSAQ-364D_2011',
+         HHIC_1997 = 'CV_HH_NET_WORTH_P_1997',
+         first.incarceration = 'INCARC_AGE_FIRST_XRND',
+         residence = 'CV_URBAN-RURAL_AGE_12_1997') %>%
+  mutate(marital_status = recode_factor(CV_MARSTAT_COLLAPSED_2017, 
+                                        `0`="NEVER-MARRIED", 
+                                        `1` = "MARRIED", 
+                                        `2` = "SEPARATED", 
+                                        `3` = "DIVORCED", 
+                                        `4` = "WIDOWED", 
+                                        `-5` = "UNKNOWN", 
+                                        `-3` = "UNKNOWN")) %>%
+  mutate(sex = recode_factor(sex, `1`="MALE", 
+                             `2`="FEMALE")) %>%
+  mutate(race = recode_factor(race, `1` = "BLACK", 
+                              `2` = "HISPANIC", 
+                              `3` = "MIXED-RACE (NON-HISP.)", 
+                              `4` = "NON-BLACK/NON-HISPANIC")) %>%
+  mutate(HHIC_1997 = case_when(HHIC_1997<0 ~ NA_real_, HHIC_1997>0 ~ HHIC_1997)) %>%
+  mutate(first.incarceration = case_when(first.incarceration<0 ~ NA_real_, first.incarceration>0 ~ first.incarceration)) %>%
+  mutate(residence = recode_factor(residence,`2` = "UNKNOWN",
+                                   `-3` = "UNKNOWN",
+                                   `-4` = "UNKNOWN",
+                                   `0` = "RURAL",
+                                   `1` = "URBAN")) %>%
   mutate_at(c("cocaine_use", "smokes", "drinks"), ~ recode_factor(.x, `0` = "NO", `1` = "YES", .default = "UNKNOWN"))
 
 table(nlsy$sex)
@@ -157,52 +180,90 @@ table(nlsy$marital_status)
 table(nlsy$cocaine_use)
 table(nlsy$smokes)
 table(nlsy$drinks)
+table(nlsy$HHIC_1997)
 
 ```
-#### Data Exploration
-Plotting 19 groups of 5 plots to visualize data per the following methods:
-- Histogram
-- scatter
-- Lin-Regression
+#### Data Exploration - 12/12
 
 ```{r}
-#
-plotHist <- function(data, xVec, yVec){
-  data %>%
-    ggplot(aes(x=xVec, y=yVec), fill = sex) +
-    geom_histogram() 
-}
-
-#Plot bar chart with error bars
-plotBar <- function(data, xVec, yVec){
-  data %>%
-    ggplot(aes(x=xVec, y=mean(yVec), fill = sex)) +
-    geom_bar(stat = "identity")
-}
-
-plotLinReg <- function(data, xVec, yVec){
-  data %>%
-    ggplot(aes(x=xVec, y=yVec, fill = sex)) +
-    geom_boxplot()
-}
-
-#
-total.income <- nlsy$income
-#
-job.income <- nlsy$`YINC-1400_2017`
-est.income <- nlsy$`YINC-1800_2017`
-spousal.income <- nlsy$`YINC-2400_2017`
-total.spousal.income <- nlsy$`YINC-2600_2017`
-est.soupsal.income <-nlsy$`YINC-2700_2017`
-
-code.dict[legible.names == "YINC-1400_2017",2]
-code.dict[legible.names == "YINC-1800_2017",2]
-code.dict[legible.names == "YINC-2400_2017",2]
-code.dict[legible.names == "YINC-2600_2017",2]
-code.dict[legible.names == "YINC-2700_2017",2]
-code.dict[encoded.names == "U1852400",1]
+#Average net worth of household in 1997 by gender as reported by parent
+income.data.HHIC1997 <- nlsy %>%
+  group_by(sex) %>%
+  summarize("avg.HHIC_1997" = mean(HHIC_1997, na.rm = TRUE),
+            'lower' = t.test(HHIC_1997, mu = mean(HHIC_1997, na.rm = TRUE))$conf.int[1],
+            'upper' = t.test(HHIC_1997, mu = mean(HHIC_1997,na.rm = TRUE))$conf.int[2])
+income.data.HHIC1997
 
 
+ggplot(data = income.data.HHIC1997, aes(x=sex, y=avg.HHIC_1997, fill=I("steelblue"))) + 
+  geom_bar(stat = "identity") +
+  geom_errorbar(aes(ymin = lower, ymax = upper), width = 0.1, position = position_dodge(0.9)) +
+  xlab("Gender") +
+  ylab("AVG Household Net Worth 1997") +
+  ggtitle("AVG Household Net Worth 1997 of Men and Women (According to Parent)") +
+  guides(fill = FALSE) #No statistically signifiant difference in average houshold net worth between men and women
+
+
+#topcoding truncates the data trends
+#you see a less of a range between 150K and mx income which is interesting, there is not gradient like with 
+#Percentage of high earning men is clearly greater
+ggplot(data = nlsy, aes(x=HHIC_1997, y=income, colour = sex, shape = sex))+
+  geom_point(alpha = 0.3)
+
+#No significant difference in HHIC_1997 between men and women
+#amongst the same demographic, but you do observie a significant right tale:
+#the data is not normally distributed, which shows that white individuals
+#have HHIC_1997 > than other groups
+ggplot(data = nlsy, aes(x=HHIC_1997)) +
+  geom_density(alpha = 0.5, aes(fill = sex))
+
+ggplot(data = nlsy, aes(x=HHIC_1997)) +
+  geom_density(alpha = 0.5, aes(fill = sex, race))
+
+
+income.data.fincarcerate <- nlsy %>%
+  group_by(sex) %>%
+  summarize("avg.firstincarcerate" = mean(first.incarceration, na.rm = TRUE),
+            'lower' = t.test(first.incarceration, mu = mean(first.incarceration, na.rm = TRUE))$conf.int[1],
+            'upper' = t.test(first.incarceration, mu = mean(first.incarceration,na.rm = TRUE))$conf.int[2])
+
+income.data.fincarcerate
+
+#Output table regarding count of indv. with zero incomes as a funciton of incarceration status & gender
+
+nlsy.incarcerate <- nlsy %>%
+  mutate(INCARC_TOTNUM_XRND = case_when(INCARC_TOTNUM_XRND ==0 ~ "NO", first.incarceration >0 ~ "YES"))
+
+
+#Jaih to work on this and do a proportionality test to help support findings
+
+income.data.fincarcerate.prop <- nlsy.incarcerate %>%
+  group_by(sex,INCARC_TOTNUM_XRND) %>%
+  summarize("# Zero Income" = sum(income <= 0, na.rm = TRUE),
+            "# Above Zero Income" = sum(income > 0, na.rm = TRUE))
+
+income.data.fincarcerate.prop <- income.data.fincarcerate.prop[!is.na(income.data.fincarcerate.prop$INCARC_TOTNUM_XRND) &
+                                                                 income.data.fincarcerate.prop$INCARC_TOTNUM_XRND == "YES" ,]
+
+#Data seems conglomerated around specific age ranges
+#Not enough women incarcerated
+#Does look like income is not as high for those incarcerated.
+#A lot of zero incomes for incarceration at any age
+ggplot(data = nlsy, aes(x=first.incarceration, y=income, colour = sex, shape = sex))+
+  geom_point(alpha = 0.3)
+
+
+gap.data.residence <- nlsy %>%
+  group_by(residence) %>%
+ summarize(income.gap = mean(income[sex == "MALE"], na.rm = TRUE) -
+              mean(income[sex == "FEMALE"], na.rm = TRUE))
+
+### Residence (Urban, Rural, Unknown)
+ggplot(data = gap.data.residence, aes(x=residence, y=income.gap, fill=I("steelblue"))) + geom_bar(stat = "identity") +
+  xlab("Location of Residence") +
+  ylab("Income Gap($)") +
+  ggtitle("Income Gap between Men and Women, by Residence Location") +
+  guides(fill = FALSE)
 ```
 
 
@@ -331,18 +392,49 @@ Hard Maximum: [9999]
 nlsy$`YEMP_INDCODE-2002.01_2017` <- cut(nlsy$`YEMP_INDCODE-2002.01_2017`, breaks = c(-5,0,169,290,369,490,569,690,769,770,1069,3990,4069,4590,4669,5790,5889,5890,6069,6390,6469,6780,6869,7190,7269,7790,7859,8470,8559,8690,8769,9290,9369,9590,9669,9890,9949,9990), labels = c("UNKNOWN","NA","AGRICULTURE, FORESTRY, FISHING","NA","MINING","NA","UTILITIES","NA","CONSTRUCTION","NA","MANUFACTURING","NA", "WHOLESALE TRADE","NA","RETAIL TRADE","NA","ENTERTAINMENT","NA","TRANSPORTATION AND wHAREHOUSING","NA","INFORMATION AND COMMUNICATION", "NA", "FINANCE, INSURANCE, AND REAL ESTATE","NA","PROFESSIONAL AND RELATED SERVICES", "NA", "EDUCATIONAL, HEALTH, AND SOCIAL SERVICES","NA","ENTERTAINMENT, ACCOMODATIONS, AND FOOD SERVICES", "NA","OTHER SERVICES","NA","PUBLIC ADMINISTRATION","NA","ACTIVE DUTY MILITARY","NA","ACS SPECIAL CODES"),include.lowest = TRUE)
 #table(nlsy$`YEMP_INDCODE-2002.01_2017`)
 
+nlsy <- nlsy[nlsy$income > 0 & nlsy$income < 150000,] # only rows of people that make money within a certain range for income and housing. give jutification
+
+nlsy <- nlsy[nlsy$income == 0, ] # further investigationon this population
+
 gap.data.gender.industry <- nlsy %>% 
-  group_by(`YEMP_INDCODE-2002.01_2017`) %>%
+  group_by(`YEMP_INDCODE-2002.01_2017`, residence) %>%
   summarize(income.gap = mean(income[sex == "MALE"], na.rm = TRUE) -
               mean(income[sex == "FEMALE"], na.rm = TRUE))
 
-ggplot(data = gap.data.gender.industry, aes(x=`YEMP_INDCODE-2002.01_2017`, y=income.gap, fill=I("steelblue"))) + geom_bar(stat = "identity") +
+ggplot(data = gap.data.gender.industry,aes(x=`YEMP_INDCODE-2002.01_2017`, y=income.gap, fill=I("steelblue"))) + 
+  geom_bar(stat = "identity") +
   xlab("Industry") +
   ylab("Income Gap($)") +
   ggtitle("Income Gap between Men and Women, by Industry") +
   guides(fill = FALSE) +
   theme(axis.text.x=element_text(angle = -40, vjust = 0))
+
+
+ggplot(
+       subset(gap.data.gender.industry, residence %in% c("RURAL", "URBAN")),
+       aes(x=`YEMP_INDCODE-2002.01_2017`, y=income.gap,fill=residence)) + 
+  geom_bar(stat = "identity") +
+  facet_grid(residence~.)+
+  xlab("Industry") +
+  ylab("Income Gap($)") +
+  ggtitle("Income Gap between Men and Women, by Industry & Residence") +
+  guides(fill = FALSE) +
+  theme(axis.text.x=element_text(angle = -40, vjust = 0))
 ```
+
+#### Collinearity Testing -12/12/20
+
+```{r}
+batch.one.var.names <-c("HHIC_1997", "residence", "race", "marital_status", "YEMP_INDCODE-2002.01_2017")
+ggpairs(nlsy[,batch.one.var.names], axisLabels = "internal")
+
+
+batch.two.var.names <-c("cocaine_use", "smokes", "drinks", "first.incarceration", "CV_BIO_MOM_AGE_YOUTH_1997")
+ggpairs(nlsy[,batch.two.var.names], axisLabels = "internal")
+
+
+```
+
 ```
 R12002.00    [CV_BIO_MOM_AGE_YOUTH]                         Survey Year: 1997
   PRIMARY VARIABLE
