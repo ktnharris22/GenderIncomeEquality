@@ -159,13 +159,17 @@ nlsy <- as_tibble(nlsy) %>%
                                         `4` = "WIDOWED", 
                                         `-5` = "UNKNOWN", 
                                         `-3` = "UNKNOWN")) %>%
-  mutate(sex = recode_factor(sex, `1`="MALE", 
+  mutate(sex = recode_factor(sex, `1`="MALE", #set Male as Baseline
                              `2`="FEMALE")) %>%
-  mutate(race = recode_factor(race, `1` = "BLACK", 
+  mutate(race = recode_factor(race, 
+                              `4` = "NON-BLACK/NON-HISPANIC",#set non-Black/non-Hispanic as Baseline
+                              `1` = "BLACK", 
                               `2` = "HISPANIC", 
-                              `3` = "MIXED-RACE (NON-HISP.)", 
-                              `4` = "NON-BLACK/NON-HISPANIC")) %>%
+                              `3` = "MIXED-RACE (NON-HISP.)"
+                              )) %>%
   mutate(HHIC_1997 = case_when(HHIC_1997<0 ~ NA_real_, HHIC_1997>0 ~ HHIC_1997)) %>%
+  mutate(emp.industry = cut(nlsy$`YEMP_INDCODE-2002.01_2017`, breaks = c(-5,0,169,290,369,490,569,690,769,770,1069,3990,4069,4590,4669,5790,5889,5890,6069,6390,6469,6780,6869,7190,7269,7790,7859,8470,8559,8690,8769,9290,9369,9590,9669,9890,9949,9990), labels = c("UNKNOWN","NA","AGRICULTURE, FORESTRY, FISHING","NA","MINING","NA","UTILITIES","NA","CONSTRUCTION","NA","MANUFACTURING","NA", "WHOLESALE TRADE","NA","RETAIL TRADE","NA","ENTERTAINMENT","NA","TRANSPORTATION AND wHAREHOUSING","NA","INFORMATION AND COMMUNICATION", "NA", "FINANCE, INSURANCE, AND REAL ESTATE","NA","PROFESSIONAL AND RELATED SERVICES", "NA", "EDUCATIONAL, HEALTH, AND SOCIAL SERVICES","NA","ENTERTAINMENT, ACCOMODATIONS, AND FOOD SERVICES", "NA","OTHER SERVICES","NA","PUBLIC ADMINISTRATION","NA","ACTIVE DUTY MILITARY","NA","ACS SPECIAL CODES"),include.lowest = TRUE)) %>% 
+  mutate(birth.mom.age = cut(nlsy$CV_BIO_MOM_AGE_YOUTH_1997, breaks = c(-Inf,0,19,29,39,49,59), labels = c("Unknown","Child/Teen","20s","30s","40s","50s+"), ordered_result = TRUE)) %>%
   mutate(first.incarceration = case_when(first.incarceration<0 ~ NA_real_, first.incarceration>0 ~ first.incarceration)) %>%
   mutate(residence = recode_factor(residence,`2` = "UNKNOWN",
                                    `-3` = "UNKNOWN",
@@ -174,13 +178,21 @@ nlsy <- as_tibble(nlsy) %>%
                                    `1` = "URBAN")) %>%
   mutate_at(c("cocaine_use", "smokes", "drinks"), ~ recode_factor(.x, `0` = "NO", `1` = "YES", .default = "UNKNOWN"))
 
+```
+
+###Understanding the basics
+```{r}
 table(nlsy$sex)
 table(nlsy$race)
 table(nlsy$marital_status)
+table(nlsy$emp.industry)
+table(nlsy$birth.mom.age)
 table(nlsy$cocaine_use)
 table(nlsy$smokes)
 table(nlsy$drinks)
-table(nlsy$HHIC_1997)
+table(nlsy$residence)
+summary(nlsy$HHIC_1997)
+#table(nlsy$HHIC_1997) <-- I wonder if we should cut this into categories like low income mid income and high income?
 
 ```
 #### Data Exploration - 12/12
@@ -201,7 +213,7 @@ ggplot(data = income.data.HHIC1997, aes(x=sex, y=avg.HHIC_1997, fill=I("steelblu
   xlab("Gender") +
   ylab("AVG Household Net Worth 1997") +
   ggtitle("AVG Household Net Worth 1997 of Men and Women (According to Parent)") +
-  guides(fill = FALSE) #No statistically signifiant difference in average houshold net worth between men and women
+  guides(fill = FALSE) #No statistically significant difference in average houshold net worth between men and women
 
 
 #topcoding truncates the data trends
@@ -266,85 +278,115 @@ ggplot(data = gap.data.residence, aes(x=residence, y=income.gap, fill=I("steelbl
   guides(fill = FALSE)
 ```
 
-
+###Data Exploration
+####Is there a wage gap between Men and Women? 
+####Does it persist over factors like race and marital status?
 ```{r}
 #sum(total.income < 0) # total na values
 
 #nlsy[nlsy < 0]  <- NA
 
 ###RACE, SEX, MARITAL STATUS
+t.test(income ~ sex, data = nlsy) #statistically significant difference between avg incomes for men and women
+
 income.data.gender <- nlsy %>%
   group_by(sex) %>%
- summarize(avg.income = mean(income))
+ summarize(avg.income = mean(income),
+           upper = t.test(income)$conf.int[1],
+           lower = t.test(income)$conf.int[2]
+           )
 
-gap.data.gender.race <- nlsy %>% 
-  group_by(race) %>%
-  summarize(income.gap = mean(income[sex == "MALE"], na.rm = TRUE) -
-              mean(income[sex == "FEMALE"], na.rm = TRUE))
-
-gap.data.marital_stat <- nlsy %>%
-  group_by(marital_status) %>%
- summarize(income.gap = mean(income[sex == "MALE"], na.rm = TRUE) -
-              mean(income[sex == "FEMALE"], na.rm = TRUE))
-
-### ALCOHOL, TOBACCO, HARD DRUGS(Cocaine)
-gap.data.gender.smokes <- nlsy %>% 
-  group_by(smokes) %>%
-  summarize(income.gap = mean(income[sex == "MALE"], na.rm = TRUE) -
-              mean(income[sex == "FEMALE"], na.rm = TRUE))
-
-gap.data.gender.cocaine_use <- nlsy %>% 
-  group_by(cocaine_use) %>%
-  summarize(income.gap = mean(income[sex == "MALE"], na.rm = TRUE) -
-              mean(income[sex == "FEMALE"], na.rm = TRUE))
-
-gap.data.gender.drinks <- nlsy %>% 
-  group_by(drinks) %>%
-  summarize(income.gap = mean(income[sex == "MALE"], na.rm = TRUE) -
-              mean(income[sex == "FEMALE"], na.rm = TRUE))
-
-
-
-###RACE, SEX, MARITAL STATUS
 ggplot(data = income.data.gender, aes(x=sex, y=avg.income, fill=I("steelblue"))) + geom_bar(stat = "identity") +
   xlab("Gender") +
   ylab("Income") +
   ggtitle("AVG Income of Men and Women") +
-  guides(fill = FALSE) #obvious gap between average income between men and women
+  guides(fill = FALSE) +
+  geom_errorbar(aes(ymax = upper, ymin = lower), width = 0.1, size = 1)
+  #obvious gap between average income between men and women. Appears to be statistically significant based off of error bars
 
-ggplot(data = gap.data.gender.race, aes(x=race, y=income.gap, fill=I("steelblue"))) + geom_bar(stat = "identity") +
+gap.data.gender.race <- nlsy %>% 
+  group_by(race) %>%
+  summarize(income.gap = mean(income[sex == "MALE"], na.rm = TRUE) 
+            - mean(income[sex == "FEMALE"], na.rm = TRUE),
+           upper = t.test(income ~ sex)$conf.int[1],
+           lower = t.test(income ~ sex)$conf.int[2],
+           is.significant = as.numeric(t.test(income ~ sex)$p.value < 0.05))
+  
+gap.data.gender.race$is.significant <- recode(gap.data.gender.race$is.significant, `0` = FALSE, `1` = TRUE)
+
+
+ggplot(data = gap.data.gender.race, aes(x=race, y=income.gap, fill=is.significant)) + geom_bar(stat = "identity") +
   xlab("Race") +
   ylab("Income Gap($)") +
   ggtitle("Income Gap between Men and Women, by Race") +
-  guides(fill = FALSE) +
-    theme(axis.text.x=element_text(angle = -15, vjust = 0)) #Income gap does persist over race but there is noticeable difference in the gaps
+    theme(axis.text.x=element_text(angle = -15, vjust = 0)) +
+    geom_errorbar(aes(ymax = upper, ymin = lower), width = 0.1, size = 1)
+#Income gap does persist over race but there is noticeable difference in the gaps
+#the wage gap is statistically significant for hispanic men and women and for non-black non-hispanic men and women.
 
-ggplot(data = gap.data.marital_stat, aes(x=marital_status, y=income.gap, fill=I("steelblue"))) + geom_bar(stat = "identity") +
+gap.data.marital_stat <- nlsy %>%
+  group_by(marital_status) %>%
+ summarize(income.gap = mean(income[sex == "MALE"], na.rm = TRUE) 
+           - mean(income[sex == "FEMALE"], na.rm = TRUE),
+           upper = t.test(income ~ sex)$conf.int[1],
+           lower = t.test(income ~ sex)$conf.int[2],
+           is.significant = as.numeric(t.test(income ~ sex)$p.value < 0.05))
+
+ggplot(data = gap.data.marital_stat, aes(x=marital_status, y=income.gap, fill=is.significant)) + geom_bar(stat = "identity") +
   xlab("Marital Status") +
   ylab("Income Gap($)") +
   ggtitle("Income Gap between Men and Women, by Marital Status") +
-  guides(fill = FALSE) +
-    theme(axis.text.x=element_text(angle = -15, vjust = 0)) #Huge gap in income between married men and women vs non-married
+    theme(axis.text.x=element_text(angle = -90, vjust = 0))
+  #geom_errorbar(aes(ymax = upper, ymin = lower), width = 0.1, size = 1)
+#Huge gap in income between married men and women vs non-married
 
+```
+```{r}
 ### ALCOHOL, TOBACCO, HARD DRUGS(Cocaine)
-ggplot(data = gap.data.gender.smokes, aes(x=smokes, y=income.gap, fill=I("steelblue"))) + geom_bar(stat = "identity") +
+gap.data.gender.smokes <- nlsy %>% 
+  group_by(smokes) %>%
+  summarize(income.gap = mean(income[sex == "MALE"], na.rm = TRUE) - mean(income[sex == "FEMALE"], na.rm = TRUE),
+           upper = t.test(income ~ sex)$conf.int[1],
+           lower = t.test(income ~ sex)$conf.int[2],
+           is.significant = as.numeric(t.test(income ~ sex)$p.value < 0.05))
+
+ggplot(data = gap.data.gender.smokes, aes(x=smokes, y=income.gap, fill=is.significant)) + geom_bar(stat = "identity") +
   xlab("Smokes") +
   ylab("Income Gap($)") +
   ggtitle("Income Gap between Men and Women, by Smokes") +
-  guides(fill = FALSE) #slight difference in wage gap between men and women who smoke and don't
+  geom_errorbar(aes(ymax = upper, ymin = lower), width = 0.1, size = 1)
+#slight difference in wage gap between men and women who smoke. Not statistically significant based off error bars. Will not include in linear model.
 
-ggplot(data = gap.data.gender.cocaine_use, aes(x=cocaine_use, y=income.gap, fill=I("steelblue"))) + geom_bar(stat = "identity") +
+gap.data.gender.cocaine_use <- nlsy %>% 
+  group_by(cocaine_use) %>%
+  summarize(income.gap = mean(income[sex == "MALE"], na.rm = TRUE) - mean(income[sex == "FEMALE"], na.rm = TRUE),
+           upper = t.test(income ~ sex)$conf.int[1],
+           lower = t.test(income ~ sex)$conf.int[2],
+           is.significant = as.numeric(t.test(income ~ sex)$p.value < 0.05))
+
+ggplot(data = gap.data.gender.cocaine_use, aes(x=cocaine_use, y=income.gap, fill=is.significant)) + geom_bar(stat = "identity") +
   xlab("Cocaine Use") +
   ylab("Income Gap($)") +
   ggtitle("Income Gap between Men and Women, by Cocaine Use") +
-  guides(fill = FALSE) #Cocaine use does not seem to affect the wage gap at all. The bars are almost of equal height.
+    geom_errorbar(aes(ymax = upper, ymin = lower), width = 0.1, size = 1)
+#Cocaine use does not seem to affect the wage gap at all. The bars are almost of equal height.
 
-ggplot(data = gap.data.gender.drinks, aes(x=drinks, y=income.gap, fill=I("steelblue"))) + geom_bar(stat = "identity") +
+gap.data.gender.drinks <- nlsy %>% 
+  group_by(drinks) %>%
+  summarize(income.gap = mean(income[sex == "MALE"], na.rm = TRUE) -
+              mean(income[sex == "FEMALE"], na.rm = TRUE),
+           upper = t.test(income ~ sex)$conf.int[1],
+           lower = t.test(income ~ sex)$conf.int[2],
+           is.significant = as.numeric(t.test(income ~ sex)$p.value < 0.05))
+
+ggplot(data = gap.data.gender.drinks, aes(x=drinks, y=income.gap, fill=is.significant)) + geom_bar(stat = "identity") +
   xlab("Drinks") +
   ylab("Income Gap($)") +
   ggtitle("Income Gap between Men and Women, by Drinks") +
-  guides(fill = FALSE) #Noticeable difference in the wage gap between men and women who drink and don't drink
+    geom_errorbar(aes(ymax = upper, ymin = lower), width = 0.1, size = 1)
+#Noticeable difference in the wage gap between men and women who drink and don't drink but still not seemingly significant based on error bars.
 
+#ALL of these showed substance use has no affect on the wage gap. The wage gap is significant for every category of substance use whether they partake or not.
 ```
 ```
 U17180.00    [YEMP_INDCODE-2002.01]                         Survey Year: 2017
@@ -389,54 +431,56 @@ Hard Minimum: [0]
 Hard Maximum: [9999]
 ```
 ```{r}
-#nlsy$`YEMP_INDCODE-2002.01_2017` <- cut(nlsy$`YEMP_INDCODE-2002.01_2017`, breaks = c(-5,0,169,290,369,490,569,690,769,770,1069,3990,4069,4590,4669,5790,5889,5890,6069,6390,6469,6780,6869,7190,7269,7790,7859,8470,8559,8690,8769,9290,9369,9590,9669,9890,9949,9990), labels = c("UNKNOWN","NA","AGRICULTURE, FORESTRY, FISHING","NA","MINING","NA","UTILITIES","NA","CONSTRUCTION","NA","MANUFACTURING","NA", "WHOLESALE TRADE","NA","RETAIL TRADE","NA","ENTERTAINMENT","NA","TRANSPORTATION AND wHAREHOUSING","NA","INFORMATION AND COMMUNICATION", "NA", "FINANCE, INSURANCE, AND REAL ESTATE","NA","PROFESSIONAL AND RELATED SERVICES", "NA", "EDUCATIONAL, HEALTH, AND SOCIAL SERVICES","NA","ENTERTAINMENT, ACCOMODATIONS, AND FOOD SERVICES", "NA","OTHER SERVICES","NA","PUBLIC ADMINISTRATION","NA","ACTIVE DUTY MILITARY","NA","ACS SPECIAL CODES"),include.lowest = TRUE)
-#table(nlsy$`YEMP_INDCODE-2002.01_2017`)
+nlsy.no.military <- subset(nlsy, emp.industry!="ACTIVE DUTY MILITARY")
+#removed active duty military because there were no women in the survey and could not calculate a wage gap
 
-nlsy <- nlsy[nlsy$income > 0 & nlsy$income < 150000,] # only rows of people that make money within a certain range for income and housing. give jutification
 
-nlsy <- nlsy[nlsy$income == 0, ] # further investigationon this population
-
-gap.data.gender.industry <- nlsy %>% 
-  group_by(`YEMP_INDCODE-2002.01_2017`, residence) %>%
+gap.data.gender.industry <- nlsy.no.military %>% 
+  group_by(emp.industry) %>%
   summarize(income.gap = mean(income[sex == "MALE"], na.rm = TRUE) -
               mean(income[sex == "FEMALE"], na.rm = TRUE),
-            upper = -t.test(income ~ sex)$conf.int[1],
-            lower = -t.test(income ~ sex)$conf.int[2],
-            is.significant = as.numeric(t.test(income ~ sex)$p.value < 0.05))
+           upper = t.test(income ~ sex)$conf.int[1],
+           lower = t.test(income ~ sex)$conf.int[2],
+           is.significant = as.numeric(t.test(income ~ sex)$p.value < 0.05))
 
-ggplot(data = gap.data.gender.industry,aes(x=`YEMP_INDCODE-2002.01_2017`, y=income.gap, fill=I("steelblue"))) + 
+ggplot(data = gap.data.gender.industry,aes(x=emp.industry, y=income.gap, fill=is.significant)) + 
   geom_bar(stat = "identity") +
   xlab("Industry") +
-  ylab("Income Gap($)") +
+  ylab("Income Gap ($)") +
   ggtitle("Income Gap between Men and Women, by Industry") +
-  guides(fill = FALSE) +
-  theme(axis.text.x=element_text(angle = -40, vjust = 0))
+  theme(axis.text.x=element_text(angle = -90, vjust = 0, size=5)) #+     geom_errorbar(aes(ymax = upper, ymin = lower), width = 0.1, size = 1)
+#Persistent statistically significant wage gap between men and women even across industries
+```
 
+```{r}
 
-#persistant wage gap between men and women even across genders
+#nlsy <- nlsy[nlsy$income > 0 & nlsy$income < 150000,] # only rows of people that make money within a certain range for income and housing. give justification
 
+#nlsy <- nlsy[nlsy$income == 0, ] # further investigation this population
 
-ggplot(
-       subset(gap.data.gender.industry, residence %in% c("RURAL", "URBAN")),
-       aes(x=`YEMP_INDCODE-2002.01_2017`, y=income.gap,fill=residence)) + 
-  geom_bar(stat = "identity") +
-  facet_grid(residence~.)+
-  xlab("Industry") +
-  ylab("Income Gap($)") +
-  ggtitle("Income Gap between Men and Women, by Industry & Residence") +
-  guides(fill = FALSE) +
-  theme(axis.text.x=element_text(angle = -40, vjust = 0))
+#ggplot(
+#       subset(gap.data.gender.industry, residence %in% c("RURAL", "URBAN")),
+#       aes(x=emp.industry, y=income.gap,fill=residence)) + 
+#  geom_bar(stat = "identity") +
+#  facet_grid(residence~.)+
+#  xlab("Industry") +
+#  ylab("Income Gap($)") +
+#  ggtitle("Income Gap between Men and Women, by Industry & Residence") +
+#  guides(fill = FALSE) +
+#  theme(axis.text.x=element_text(angle = -40, vjust = 0))
 ```
 
 #### Collinearity Testing -12/12/20
 
 ```{r}
-batch.one.var.names <-c("HHIC_1997", "residence", "race", "marital_status", "YEMP_INDCODE-2002.01_2017")
-ggpairs(nlsy[,batch.one.var.names], axisLabels = "internal")
+#batch.one.var.names <-c("HHIC_1997", "residence", "race", "marital_status", "")
+#ggpairs(nlsy[,batch.one.var.names], axisLabels = "internal")
 
 
-batch.two.var.names <-c("cocaine_use", "smokes", "drinks", "first.incarceration", "CV_BIO_MOM_AGE_YOUTH_1997")
-ggpairs(nlsy[,batch.two.var.names], axisLabels = "internal")
+#batch.two.var.names <-c("cocaine_use", "smokes", "drinks", "first.incarceration", "CV_BIO_MOM_AGE_YOUTH_1997")
+#ggpairs(nlsy[,batch.two.var.names], axisLabels = "internal")
+
+
 
 
 ```
@@ -479,31 +523,80 @@ Hard Minimum: [0]
 Hard Maximum: [118]
 ```
 ```{r}
-#nlsy$CV_BIO_MOM_AGE_YOUTH_1997 <- cut(nlsy$CV_BIO_MOM_AGE_YOUTH_1997, breaks = c(-Inf,0,20,30,40,50,60), labels = c("Unknown","Child/Teen","20s","30s","40s","50s+"))
+nlsy.valid_mom_age <- subset(nlsy, CV_BIO_MOM_AGE_YOUTH_1997 > 0)
 
-
-gap.data.AGE_MOM_YOUTH <- nlsy %>%
-  group_by(CV_BIO_MOM_AGE_YOUTH_1997) %>%
+gap.data.AGE_MOM_YOUTH <- nlsy.valid_mom_age %>%
+  group_by(birth.mom.age) %>%
  summarize(
    income.gap = mean(income[sex == "MALE"], na.rm = TRUE) -
-              mean(income[sex == "FEMALE"], na.rm = TRUE),
-            upper = -t.test(income ~ sex)$conf.int[1],
-            lower = -t.test(income ~ sex)$conf.int[2],
-            is.significant = as.numeric(t.test(income ~ gender)$p.value < 0.05)
+              mean(income[sex == "FEMALE"], na.rm = TRUE)
    )
 
-ggplot(data = gap.data.AGE_MOM_YOUTH, aes(x=CV_BIO_MOM_AGE_YOUTH_1997, y=income.gap, fill=is.significant)) + geom_bar(stat = "identity") +
+ggplot(data = gap.data.AGE_MOM_YOUTH, aes(x=birth.mom.age, y=income.gap, fill=I("steelblue"))) + geom_bar(stat = "identity") +
   xlab("Age of Mother at Birth of Child") +
   ylab("Income Gap($)") +
   ggtitle("Income Gap between Men and Women, by Age of Mother at Birth") +
-    geom_errorbar(aes(ymax = upper, ymin = lower), width = 0.1, size = 1) +
   guides(fill = FALSE)
+
+ggplot(nlsy.valid_mom_age, aes(x = CV_BIO_MOM_AGE_YOUTH_1997,)) + xlab("Mother's Age at Birth of Child") + geom_histogram(aes(fill = race))
+
+plot.interact <- qplot(x = CV_BIO_MOM_AGE_YOUTH_1997, y = income, color = sex, data = nlsy.valid_mom_age) + stat_smooth(method = "lm", se = FALSE, fullrange = TRUE)
+plot.interact
+
+#in general we can see that mother's age when child was born is positively correlated with income for both men and women.
+
+
+```
+```{r}
+### COLINEARITY TESTS
+library(GGally)
+#income.vars <- c("sex","race","marital_status","emp.industry","residence")
+#income.vars.noindustry <- c("sex","race","marital_status","residence")
+#ggpairs(nlsy[,c("sex","race","marital_status")], cardinality_threshold = 30)
+
+#USE SOMETHING LIKE THIS... ONLY test for colinearity between variables that seem like they would be colinear
+
+# Function taken from ?pairs Example section.  
+panel.cor <- function(x, y, digits = 2, prefix = "", cex.cor, ...)
+{
+    usr <- par("usr"); on.exit(par(usr))
+    par(usr = c(0, 1, 0, 1))
+    r <- abs(cor(x, y))
+    txt <- format(c(r, 0.123456789), digits = digits)[1]
+    txt <- paste0(prefix, txt)
+    if(missing(cex.cor)) cex.cor <- 0.8/strwidth(txt)
+    text(0.5, 0.5, txt, cex = pmax(1, cex.cor * r))
+}
+
+# Use panel.cor to display correlations in lower panel.
+pairs(crime[,economic.var.names], lower.panel = panel.cor)
+
 
 ```
 
-
 ```{r}
-table(nlsy$sex)
+###LET'S RUN SOME REGRESSIONS
+lm.sex <- lm(income ~ sex, data = nlsy)
+kable(coef(summary(lm.sex)), digits = c(0, 0, 2, 4))
+
+lm.race.sex <- lm(income ~ sex + sex*race, data = nlsy)
+kable(coef(summary(lm.race.sex)), digits = c(0, 0, 2, 4))
+
+lm.race.sex.residence <-lm(income ~ sex + sex*race*residence, data = nlsy)
+kable(coef(summary(lm.race.sex.residence)), digits = c(0, 0, 2, 4))
+
+lm.race.sex.mar_stat <- lm(income ~ sex + sex*race*marital_status, data = nlsy) ###The most significant out of the bunch
+kable(coef(summary(lm.race.sex.mar_stat)), digits = c(0, 0, 2, 4))
+
+lm.race.sex.industry <- lm(income ~ sex + sex*race*emp.industry, data = nlsy)
+kable(coef(summary(lm.race.sex.industry)), digits = c(0, 0, 2, 4))
+
+lm.race.sex.mar_stat.industry <- lm(income ~ sex + sex*race*marital_status*emp.industry, data = nlsy)
+
+kable(coef(summary(lm.race.sex.mar_stat.industry)), digits = c(0, 0, 2, 4))
+
+anova(lm.sex, lm.race.sex, lm.race.sex.residence, lm.race.sex.mar_stat, lm.race.sex.industry, lm.race.sex.mar_stat.industry)
+
 ```
 
 
