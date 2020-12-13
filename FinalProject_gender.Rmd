@@ -317,33 +317,33 @@ ggplot(data = gap.data.gender.race, aes(x=race, y=income.gap, fill=I("steelblue"
   ylab("Income Gap($)") +
   ggtitle("Income Gap between Men and Women, by Race") +
   guides(fill = FALSE) +
-    theme(axis.text.x=element_text(angle = -15, vjust = 0)) #Significant gap between races
+    theme(axis.text.x=element_text(angle = -15, vjust = 0)) #Income gap does persist over race but there is noticeable difference in the gaps
 
 ggplot(data = gap.data.marital_stat, aes(x=marital_status, y=income.gap, fill=I("steelblue"))) + geom_bar(stat = "identity") +
   xlab("Marital Status") +
   ylab("Income Gap($)") +
   ggtitle("Income Gap between Men and Women, by Marital Status") +
   guides(fill = FALSE) +
-    theme(axis.text.x=element_text(angle = -15, vjust = 0)) #Huge gap in income between married men and women
+    theme(axis.text.x=element_text(angle = -15, vjust = 0)) #Huge gap in income between married men and women vs non-married
 
 ### ALCOHOL, TOBACCO, HARD DRUGS(Cocaine)
 ggplot(data = gap.data.gender.smokes, aes(x=smokes, y=income.gap, fill=I("steelblue"))) + geom_bar(stat = "identity") +
   xlab("Smokes") +
   ylab("Income Gap($)") +
   ggtitle("Income Gap between Men and Women, by Smokes") +
-  guides(fill = FALSE)
+  guides(fill = FALSE) #slight difference in wage gap between men and women who smoke and don't
 
 ggplot(data = gap.data.gender.cocaine_use, aes(x=cocaine_use, y=income.gap, fill=I("steelblue"))) + geom_bar(stat = "identity") +
   xlab("Cocaine Use") +
   ylab("Income Gap($)") +
   ggtitle("Income Gap between Men and Women, by Cocaine Use") +
-  guides(fill = FALSE)
+  guides(fill = FALSE) #Cocaine use does not seem to affect the wage gap at all. The bars are almost of equal height.
 
 ggplot(data = gap.data.gender.drinks, aes(x=drinks, y=income.gap, fill=I("steelblue"))) + geom_bar(stat = "identity") +
   xlab("Drinks") +
   ylab("Income Gap($)") +
   ggtitle("Income Gap between Men and Women, by Drinks") +
-  guides(fill = FALSE)
+  guides(fill = FALSE) #Noticeable difference in the wage gap between men and women who drink and don't drink
 
 ```
 ```
@@ -389,7 +389,7 @@ Hard Minimum: [0]
 Hard Maximum: [9999]
 ```
 ```{r}
-nlsy$`YEMP_INDCODE-2002.01_2017` <- cut(nlsy$`YEMP_INDCODE-2002.01_2017`, breaks = c(-5,0,169,290,369,490,569,690,769,770,1069,3990,4069,4590,4669,5790,5889,5890,6069,6390,6469,6780,6869,7190,7269,7790,7859,8470,8559,8690,8769,9290,9369,9590,9669,9890,9949,9990), labels = c("UNKNOWN","NA","AGRICULTURE, FORESTRY, FISHING","NA","MINING","NA","UTILITIES","NA","CONSTRUCTION","NA","MANUFACTURING","NA", "WHOLESALE TRADE","NA","RETAIL TRADE","NA","ENTERTAINMENT","NA","TRANSPORTATION AND wHAREHOUSING","NA","INFORMATION AND COMMUNICATION", "NA", "FINANCE, INSURANCE, AND REAL ESTATE","NA","PROFESSIONAL AND RELATED SERVICES", "NA", "EDUCATIONAL, HEALTH, AND SOCIAL SERVICES","NA","ENTERTAINMENT, ACCOMODATIONS, AND FOOD SERVICES", "NA","OTHER SERVICES","NA","PUBLIC ADMINISTRATION","NA","ACTIVE DUTY MILITARY","NA","ACS SPECIAL CODES"),include.lowest = TRUE)
+#nlsy$`YEMP_INDCODE-2002.01_2017` <- cut(nlsy$`YEMP_INDCODE-2002.01_2017`, breaks = c(-5,0,169,290,369,490,569,690,769,770,1069,3990,4069,4590,4669,5790,5889,5890,6069,6390,6469,6780,6869,7190,7269,7790,7859,8470,8559,8690,8769,9290,9369,9590,9669,9890,9949,9990), labels = c("UNKNOWN","NA","AGRICULTURE, FORESTRY, FISHING","NA","MINING","NA","UTILITIES","NA","CONSTRUCTION","NA","MANUFACTURING","NA", "WHOLESALE TRADE","NA","RETAIL TRADE","NA","ENTERTAINMENT","NA","TRANSPORTATION AND wHAREHOUSING","NA","INFORMATION AND COMMUNICATION", "NA", "FINANCE, INSURANCE, AND REAL ESTATE","NA","PROFESSIONAL AND RELATED SERVICES", "NA", "EDUCATIONAL, HEALTH, AND SOCIAL SERVICES","NA","ENTERTAINMENT, ACCOMODATIONS, AND FOOD SERVICES", "NA","OTHER SERVICES","NA","PUBLIC ADMINISTRATION","NA","ACTIVE DUTY MILITARY","NA","ACS SPECIAL CODES"),include.lowest = TRUE)
 #table(nlsy$`YEMP_INDCODE-2002.01_2017`)
 
 nlsy <- nlsy[nlsy$income > 0 & nlsy$income < 150000,] # only rows of people that make money within a certain range for income and housing. give jutification
@@ -399,7 +399,10 @@ nlsy <- nlsy[nlsy$income == 0, ] # further investigationon this population
 gap.data.gender.industry <- nlsy %>% 
   group_by(`YEMP_INDCODE-2002.01_2017`, residence) %>%
   summarize(income.gap = mean(income[sex == "MALE"], na.rm = TRUE) -
-              mean(income[sex == "FEMALE"], na.rm = TRUE))
+              mean(income[sex == "FEMALE"], na.rm = TRUE),
+            upper = -t.test(income ~ sex)$conf.int[1],
+            lower = -t.test(income ~ sex)$conf.int[2],
+            is.significant = as.numeric(t.test(income ~ sex)$p.value < 0.05))
 
 ggplot(data = gap.data.gender.industry,aes(x=`YEMP_INDCODE-2002.01_2017`, y=income.gap, fill=I("steelblue"))) + 
   geom_bar(stat = "identity") +
@@ -408,6 +411,9 @@ ggplot(data = gap.data.gender.industry,aes(x=`YEMP_INDCODE-2002.01_2017`, y=inco
   ggtitle("Income Gap between Men and Women, by Industry") +
   guides(fill = FALSE) +
   theme(axis.text.x=element_text(angle = -40, vjust = 0))
+
+
+#persistant wage gap between men and women even across genders
 
 
 ggplot(
@@ -473,18 +479,24 @@ Hard Minimum: [0]
 Hard Maximum: [118]
 ```
 ```{r}
-nlsy$CV_BIO_MOM_AGE_YOUTH_1997 <- cut(nlsy$CV_BIO_MOM_AGE_YOUTH_1997, breaks = c(-Inf,0,20,30,40,50,60), labels = c("Unknown","Child/Teen","20s","30s","40s","50s+"))
+#nlsy$CV_BIO_MOM_AGE_YOUTH_1997 <- cut(nlsy$CV_BIO_MOM_AGE_YOUTH_1997, breaks = c(-Inf,0,20,30,40,50,60), labels = c("Unknown","Child/Teen","20s","30s","40s","50s+"))
 
 
 gap.data.AGE_MOM_YOUTH <- nlsy %>%
   group_by(CV_BIO_MOM_AGE_YOUTH_1997) %>%
- summarize(income.gap = mean(income[sex == "MALE"], na.rm = TRUE) -
-              mean(income[sex == "FEMALE"], na.rm = TRUE))
+ summarize(
+   income.gap = mean(income[sex == "MALE"], na.rm = TRUE) -
+              mean(income[sex == "FEMALE"], na.rm = TRUE),
+            upper = -t.test(income ~ sex)$conf.int[1],
+            lower = -t.test(income ~ sex)$conf.int[2],
+            is.significant = as.numeric(t.test(income ~ gender)$p.value < 0.05)
+   )
 
-ggplot(data = gap.data.AGE_MOM_YOUTH, aes(x=CV_BIO_MOM_AGE_YOUTH_1997, y=income.gap, fill=I("steelblue"))) + geom_bar(stat = "identity") +
+ggplot(data = gap.data.AGE_MOM_YOUTH, aes(x=CV_BIO_MOM_AGE_YOUTH_1997, y=income.gap, fill=is.significant)) + geom_bar(stat = "identity") +
   xlab("Age of Mother at Birth of Child") +
   ylab("Income Gap($)") +
   ggtitle("Income Gap between Men and Women, by Age of Mother at Birth") +
+    geom_errorbar(aes(ymax = upper, ymin = lower), width = 0.1, size = 1) +
   guides(fill = FALSE)
 
 ```
