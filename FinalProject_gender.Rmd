@@ -579,19 +579,19 @@ pairs(crime[,economic.var.names], lower.panel = panel.cor)
 lm.sex <- lm(income ~ sex, data = nlsy)
 kable(coef(summary(lm.sex)), digits = c(0, 0, 2, 4))
 
-lm.race.sex <- lm(income ~ sex + sex*race, data = nlsy)
+lm.race.sex <- lm(income ~ sex*race, data = nlsy)
 kable(coef(summary(lm.race.sex)), digits = c(0, 0, 2, 4))
 
-lm.race.sex.residence <-lm(income ~ sex + sex*race*residence, data = nlsy)
+lm.race.sex.residence <-lm(income ~ sex*race*residence, data = nlsy)
 kable(coef(summary(lm.race.sex.residence)), digits = c(0, 0, 2, 4))
 
-lm.race.sex.mar_stat <- lm(income ~ sex + sex*race*marital_status, data = nlsy) ###The most significant out of the bunch
+lm.race.sex.mar_stat <- lm(income ~ sex*race*marital_status, data = nlsy) ###The most significant out of the bunch
 kable(coef(summary(lm.race.sex.mar_stat)), digits = c(0, 0, 2, 4))
 
-lm.race.sex.industry <- lm(income ~ sex + sex*race*emp.industry, data = nlsy)
+lm.race.sex.industry <- lm(income ~ sex*race*emp.industry, data = nlsy)
 kable(coef(summary(lm.race.sex.industry)), digits = c(0, 0, 2, 4))
 
-lm.race.sex.mar_stat.industry <- lm(income ~ sex + sex*race*marital_status*emp.industry, data = nlsy)
+lm.race.sex.mar_stat.industry <- lm(income ~ sex*race*marital_status*emp.industry, data = nlsy)
 
 kable(coef(summary(lm.race.sex.mar_stat.industry)), digits = c(0, 0, 2, 4))
 
