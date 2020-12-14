@@ -10,7 +10,7 @@ output: html_document
 ```{r}
 library(tidyverse)
 library(knitr)
-library(ggplot2)
+library(GGally)
 ```
 
 
@@ -128,17 +128,6 @@ colnames(nlsy) <- c("PSTRAN_GPA.01_PSTR",
     "CVC_ASSETS_FINANCIAL_30_XRND",
     "CVC_ASSETS_DEBTS_30_XRND")
 
-### Set all negative values to NA.  
-### THIS IS DONE ONLY FOR ILLUSTRATIVE PURPOSES
-### DO NOT TAKE THIS APPROACH WITHOUT CAREFUL JUSTIFICATION
-#nlsy[nlsy < 0]  <- NA
-# use mutate if/else
-
-
-#Create a data dictionary that helps with sorting and finding information on data columns
-# encoded.val <- code.dict[legible.names == "Legiblename",2]
-legible.names <- names(nlsy)
-code.dict <- data.frame(legible.names,encoded.names)
 ```
 
 #### Data Clean & Recoding
@@ -168,8 +157,10 @@ nlsy <- as_tibble(nlsy) %>%
                               `3` = "MIXED-RACE (NON-HISP.)"
                               )) %>%
   mutate(HHIC_1997 = case_when(HHIC_1997<0 ~ NA_real_, HHIC_1997>0 ~ HHIC_1997)) %>%
+  #Create industry column based upon existing YEMP_INDCODE-2002.01_2017 variable
   mutate(emp.industry = cut(nlsy$`YEMP_INDCODE-2002.01_2017`, breaks = c(-5,0,169,290,369,490,569,690,769,770,1069,3990,4069,4590,4669,5790,5889,5890,6069,6390,6469,6780,6869,7190,7269,7790,7859,8470,8559,8690,8769,9290,9369,9590,9669,9890,9949,9990), labels = c("UNKNOWN","NA","AGRICULTURE, FORESTRY, FISHING","NA","MINING","NA","UTILITIES","NA","CONSTRUCTION","NA","MANUFACTURING","NA", "WHOLESALE TRADE","NA","RETAIL TRADE","NA","ENTERTAINMENT","NA","TRANSPORTATION AND wHAREHOUSING","NA","INFORMATION AND COMMUNICATION", "NA", "FINANCE, INSURANCE, AND REAL ESTATE","NA","PROFESSIONAL AND RELATED SERVICES", "NA", "EDUCATIONAL, HEALTH, AND SOCIAL SERVICES","NA","ENTERTAINMENT, ACCOMODATIONS, AND FOOD SERVICES", "NA","OTHER SERVICES","NA","PUBLIC ADMINISTRATION","NA","ACTIVE DUTY MILITARY","NA","ACS SPECIAL CODES"),include.lowest = TRUE)) %>% 
-  mutate(birth.mom.age = cut(nlsy$CV_BIO_MOM_AGE_YOUTH_1997, breaks = c(-Inf,0,19,29,39,49,59), labels = c("Unknown","Child/Teen","20s","30s","40s","50s+"), ordered_result = TRUE)) %>%
+  mutate(birth.mom.age = cut(nlsy$CV_BIO_MOM_AGE_YOUTH_1997, breaks = c(-Inf,0,19,29,39,49,59), labels = c("Unknown","Child/Teen","20s","30s","40s","50s+"),
+                             ordered_result = TRUE)) %>%
   mutate(first.incarceration = case_when(first.incarceration<0 ~ NA_real_, first.incarceration>0 ~ first.incarceration)) %>%
   mutate(residence = recode_factor(residence,`2` = "UNKNOWN",
                                    `-3` = "UNKNOWN",
@@ -180,32 +171,40 @@ nlsy <- as_tibble(nlsy) %>%
 
 ```
 
-###Understanding the basics
+####Understanding the basics
+
 ```{r}
-table(nlsy$sex)
-table(nlsy$race)
-table(nlsy$marital_status)
-table(nlsy$emp.industry)
-table(nlsy$birth.mom.age)
-table(nlsy$cocaine_use)
-table(nlsy$smokes)
-table(nlsy$drinks)
-table(nlsy$residence)
+#Jaih to clean up tables:
+#- rename kable columns
+#- titles for every table with brief blurb on value
+kable(table(nlsy$sex))
+kable(table(nlsy$race))
+kable(table(nlsy$marital_status))
+kable(table(nlsy$emp.industry))
+kable(table(nlsy$birth.mom.age))
+kable(table(nlsy$cocaine_use))
+kable(table(nlsy$smokes))
+kable(table(nlsy$drinks))
+kable(table(nlsy$residence))
 summary(nlsy$HHIC_1997)
 #table(nlsy$HHIC_1997) <-- I wonder if we should cut this into categories like low income mid income and high income?
 
 ```
-#### Data Exploration - 12/12
+#### Data Exploration
 
 ```{r}
 #Average net worth of household in 1997 by gender as reported by parent
-income.data.HHIC1997 <- nlsy %>%
+
+#Data Clean to Remove Top Coding
+# - top-coding for the purpose of this analysis does not provide meaningful
+# information in understanding trends.  If anything it skewes the data in undescipherable ways
+nlsy.filtered <- filter(nlsy,HHIC_1997 < 600000 & income < 200000 & !is.na(nlsy$sex))
+
+income.data.HHIC1997 <- nlsy.filtered %>%
   group_by(sex) %>%
   summarize("avg.HHIC_1997" = mean(HHIC_1997, na.rm = TRUE),
             'lower' = t.test(HHIC_1997, mu = mean(HHIC_1997, na.rm = TRUE))$conf.int[1],
             'upper' = t.test(HHIC_1997, mu = mean(HHIC_1997,na.rm = TRUE))$conf.int[2])
-income.data.HHIC1997
-
 
 ggplot(data = income.data.HHIC1997, aes(x=sex, y=avg.HHIC_1997, fill=I("steelblue"))) + 
   geom_bar(stat = "identity") +
@@ -213,25 +212,21 @@ ggplot(data = income.data.HHIC1997, aes(x=sex, y=avg.HHIC_1997, fill=I("steelblu
   xlab("Gender") +
   ylab("AVG Household Net Worth 1997") +
   ggtitle("AVG Household Net Worth 1997 of Men and Women (According to Parent)") +
-  guides(fill = FALSE) #No statistically significant difference in average houshold net worth between men and women
+  guides(fill = FALSE) 
 
+#No statistically significant difference in average houshold net worth between men and women
 
-#topcoding truncates the data trends
 #you see a less of a range between 150K and mx income which is interesting, there is not gradient like with 
 #Percentage of high earning men is clearly greater
-ggplot(data = nlsy, aes(x=HHIC_1997, y=income, colour = sex, shape = sex))+
+ggplot(data = nlsy.filtered, aes(x=HHIC_1997, y=income, colour = sex, shape = sex))+
   geom_point(alpha = 0.3)
 
 #No significant difference in HHIC_1997 between men and women
 #amongst the same demographic, but you do observie a significant right tale:
 #the data is not normally distributed, which shows that white individuals
 #have HHIC_1997 > than other groups
-ggplot(data = nlsy, aes(x=HHIC_1997)) +
+ggplot(data = nlsy.filtered, aes(x=HHIC_1997)) +
   geom_density(alpha = 0.5, aes(fill = sex))
-
-ggplot(data = nlsy, aes(x=HHIC_1997)) +
-  geom_density(alpha = 0.5, aes(fill = sex, race))
-
 
 income.data.fincarcerate <- nlsy %>%
   group_by(sex) %>%
@@ -473,15 +468,39 @@ ggplot(data = gap.data.gender.industry,aes(x=emp.industry, y=income.gap, fill=is
 #### Collinearity Testing -12/12/20
 
 ```{r}
-#batch.one.var.names <-c("HHIC_1997", "residence", "race", "marital_status", "")
-#ggpairs(nlsy[,batch.one.var.names], axisLabels = "internal")
+### COLINEARITY TESTS
+
+batch.one.var.names <-c("residence","emp.industry")
+
+batch.two.var.names <-c("cocaine_use", "smokes", "drinks", "first.incarceration")
+
+batch.three.var.names <-c("first.incarceration", "CV_BIO_MOM_AGE_YOUTH_1997")
+
+#income.vars <- c("sex","race","marital_status","emp.industry","residence")
+
+#USE SOMETHING LIKE THIS... ONLY test for colinearity between variables that seem like they would be colinear
+
+# Function taken from ?pairs Example section.  
+# panel.cor <- function(x, y, digits = 2, prefix = "", cex.cor, ...)
+# {
+#     usr <- par("usr"); on.exit(par(usr))
+#     par(usr = c(0, 1, 0, 1))
+#     r <- abs(cor(x, y))
+#     txt <- format(c(r, 0.123456789), digits = digits)[1]
+#     txt <- paste0(prefix, txt)
+#     if(missing(cex.cor)) cex.cor <- 0.8/strwidth(txt)
+#     text(0.5, 0.5, txt, cex = pmax(1, cex.cor * r))
+# }
+# 
+# # Use panel.cor to display correlations in lower panel.
+# pairs(nlsy[,income.vars], lower.panel = panel.cor)
 
 
-#batch.two.var.names <-c("cocaine_use", "smokes", "drinks", "first.incarceration", "CV_BIO_MOM_AGE_YOUTH_1997")
-#ggpairs(nlsy[,batch.two.var.names], axisLabels = "internal")
+ggpairs(nlsy[,c(batch.two.var.names)], axisLabels = "internal", cardinality_threshold = 20)
 
+ggpairs(nlsy[,c(batch.one.var.names)], axisLabels = "internal", cardinality_threshold = 20)
 
-
+ggpairs(nlsy[,c(batch.three.var.names)], axisLabels = "internal", cardinality_threshold = 20)
 
 ```
 
@@ -544,32 +563,6 @@ plot.interact <- qplot(x = CV_BIO_MOM_AGE_YOUTH_1997, y = income, color = sex, d
 plot.interact
 
 #in general we can see that mother's age when child was born is positively correlated with income for both men and women.
-
-
-```
-```{r}
-### COLINEARITY TESTS
-library(GGally)
-#income.vars <- c("sex","race","marital_status","emp.industry","residence")
-#income.vars.noindustry <- c("sex","race","marital_status","residence")
-#ggpairs(nlsy[,c("sex","race","marital_status")], cardinality_threshold = 30)
-
-#USE SOMETHING LIKE THIS... ONLY test for colinearity between variables that seem like they would be colinear
-
-# Function taken from ?pairs Example section.  
-panel.cor <- function(x, y, digits = 2, prefix = "", cex.cor, ...)
-{
-    usr <- par("usr"); on.exit(par(usr))
-    par(usr = c(0, 1, 0, 1))
-    r <- abs(cor(x, y))
-    txt <- format(c(r, 0.123456789), digits = digits)[1]
-    txt <- paste0(prefix, txt)
-    if(missing(cex.cor)) cex.cor <- 0.8/strwidth(txt)
-    text(0.5, 0.5, txt, cex = pmax(1, cex.cor * r))
-}
-
-# Use panel.cor to display correlations in lower panel.
-pairs(crime[,economic.var.names], lower.panel = panel.cor)
 
 
 ```
