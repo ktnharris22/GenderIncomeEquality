@@ -167,7 +167,36 @@ nlsy <- as_tibble(nlsy) %>%
                                    `-4` = "UNKNOWN",
                                    `0` = "RURAL",
                                    `1` = "URBAN")) %>%
-  mutate_at(c("cocaine_use", "smokes", "drinks"), ~ recode_factor(.x, `0` = "NO", `1` = "YES", .default = "UNKNOWN"))
+  mutate_at(c("cocaine_use", "smokes", "drinks"), ~ recode_factor(.x, `0` = "NO", `1` = "YES", .default = "UNKNOWN")) %>%
+  #creates additional column that indicates whether or not an individual has ever been incarcerated
+  mutate(ever.incarcerated = case_when(INCARC_TOTNUM_XRND ==0 ~ "NO", INCARC_TOTNUM_XRND >0 ~ "YES")) %>%
+  #creates additional column that indicates whether or not child lives with at least one biological parent
+  mutate(bio.status = case_when(CVC_YTH_REL_HH_AGE6_YCHR_XRND == 1 ~ "BIO", 
+                                CVC_YTH_REL_HH_AGE6_YCHR_XRND == 2 ~ "BIO",
+                                CVC_YTH_REL_HH_AGE6_YCHR_XRND == 3 ~ "BIO",
+                                CVC_YTH_REL_HH_AGE6_YCHR_XRND == 4 ~ "BIO",
+                                CVC_YTH_REL_HH_AGE6_YCHR_XRND == 5 ~ "BIO",
+                                CVC_YTH_REL_HH_AGE6_YCHR_XRND == 6 ~ "NON.BIO",
+                                CVC_YTH_REL_HH_AGE6_YCHR_XRND == 7 ~ "NON.BIO",
+                                CVC_YTH_REL_HH_AGE6_YCHR_XRND == 8 ~ "NON.BIO",
+                                CVC_YTH_REL_HH_AGE6_YCHR_XRND == 9 ~ "NON.BIO",
+                                CVC_YTH_REL_HH_AGE6_YCHR_XRND == 10 ~ "NON.BIO",
+                                CVC_YTH_REL_HH_AGE6_YCHR_XRND == -3 ~ "UNKNOWN",
+                                CVC_YTH_REL_HH_AGE6_YCHR_XRND == -4 ~ "UNKNOWN")) %>%
+  #creates additional column that indicates Number of parents in the household (0,1,2)
+  #Child assigned to at least one parent unless explicitly stated living in group quarters
+  mutate(num.parent = case_when(CVC_YTH_REL_HH_AGE6_YCHR_XRND == 1 ~ 2, 
+                                CVC_YTH_REL_HH_AGE6_YCHR_XRND == 2 ~ 2,
+                                CVC_YTH_REL_HH_AGE6_YCHR_XRND == 3 ~ 2,
+                                CVC_YTH_REL_HH_AGE6_YCHR_XRND == 4 ~ 1,
+                                CVC_YTH_REL_HH_AGE6_YCHR_XRND == 5 ~ 1,
+                                CVC_YTH_REL_HH_AGE6_YCHR_XRND == 6 ~ 2,
+                                CVC_YTH_REL_HH_AGE6_YCHR_XRND == 7 ~ 2,
+                                CVC_YTH_REL_HH_AGE6_YCHR_XRND == 8 ~ 1,
+                                CVC_YTH_REL_HH_AGE6_YCHR_XRND == 9 ~ 0,
+                                CVC_YTH_REL_HH_AGE6_YCHR_XRND == 10 ~ 0,
+                                CVC_YTH_REL_HH_AGE6_YCHR_XRND == -3 ~ NA_real_,
+                                CVC_YTH_REL_HH_AGE6_YCHR_XRND == -4 ~ NA_real_))
 
 ```
 
@@ -228,29 +257,43 @@ ggplot(data = nlsy.filtered, aes(x=HHIC_1997, y=income, colour = sex, shape = se
 ggplot(data = nlsy.filtered, aes(x=HHIC_1997)) +
   geom_density(alpha = 0.5, aes(fill = sex))
 
-income.data.fincarcerate <- nlsy %>%
+#Investigation on Incarceration
+
+nlsy.filtered <- filter(nlsy, income < 200000 & !is.na(nlsy$sex))
+
+incarceration.age.data <- nlsy %>%
   group_by(sex) %>%
   summarize("avg.firstincarcerate" = mean(first.incarceration, na.rm = TRUE),
             'lower' = t.test(first.incarceration, mu = mean(first.incarceration, na.rm = TRUE))$conf.int[1],
             'upper' = t.test(first.incarceration, mu = mean(first.incarceration,na.rm = TRUE))$conf.int[2])
 
-income.data.fincarcerate
+ggplot(data = incarceration.age.data, aes(x=sex, y=avg.firstincarcerate, fill=I("steelblue"))) + 
+  geom_bar(stat = "identity") +
+  geom_errorbar(aes(ymin = lower, ymax = upper), width = 0.1, position = position_dodge(0.9)) +
+  xlab("Gender") +
+  ylab("Average Age of Incarceration") +
+  ggtitle("Average Age of Incarceration (According to Gender)") +
+  guides(fill = FALSE) 
 
-#Output table regarding count of indv. with zero incomes as a funciton of incarceration status & gender
 
-nlsy.incarcerate <- nlsy %>%
-  mutate(INCARC_TOTNUM_XRND = case_when(INCARC_TOTNUM_XRND ==0 ~ "NO", first.incarceration >0 ~ "YES"))
+#Men on average have a slightly higher average incarceration age than women.
+#Data potentially look statistically significant.
+
+#Output table to test whether odds of having above zero income for previously incarcerated women \
+# is lower than previously incarcerated men 
 
 
-#Jaih to work on this and do a proportionality test to help support findings
+incarceration.income.table <- filter(nlsy, nlsy$ever.incarcerated == 'YES') %>%
+  mutate(non.zincome = case_when(income <=0 ~ "NO", income >0 ~ "YES"))
 
-income.data.fincarcerate.prop <- nlsy.incarcerate %>%
-  group_by(sex,INCARC_TOTNUM_XRND) %>%
-  summarize("# Zero Income" = sum(income <= 0, na.rm = TRUE),
-            "# Above Zero Income" = sum(income > 0, na.rm = TRUE))
 
-income.data.fincarcerate.prop <- income.data.fincarcerate.prop[!is.na(income.data.fincarcerate.prop$INCARC_TOTNUM_XRND) &
-                                                                 income.data.fincarcerate.prop$INCARC_TOTNUM_XRND == "YES" ,]
+incarceration.income.table <- with(incarceration.income.table, table(non.zincome, sex))
+
+kable(incarceration.income.table)
+
+#The odds of making non-zero income for men who have been incarcerated
+# is 1.43266 higher than for incarerated women.
+incarceration.fisher.test <- fisher.test(incarceration.income.table)
 
 #Data seems conglomerated around specific age ranges
 #Not enough women incarcerated
@@ -259,18 +302,26 @@ income.data.fincarcerate.prop <- income.data.fincarcerate.prop[!is.na(income.dat
 ggplot(data = nlsy, aes(x=first.incarceration, y=income, colour = sex, shape = sex))+
   geom_point(alpha = 0.3)
 
+##Residence: URban and Rural
 
 gap.data.residence <- nlsy %>%
   group_by(residence) %>%
- summarize(income.gap = mean(income[sex == "MALE"], na.rm = TRUE) -
-              mean(income[sex == "FEMALE"], na.rm = TRUE))
+  summarize(income.gap = (mean(income[sex == "MALE"], na.rm = TRUE) - mean(income[sex == "FEMALE"], na.rm = TRUE)),
+              'lower' = t.test(income ~ sex)$conf.int[1],
+              'upper' = t.test(income ~ sex)$conf.int[2])
 
-### Residence (Urban, Rural, Unknown)
-ggplot(data = gap.data.residence, aes(x=residence, y=income.gap, fill=I("steelblue"))) + geom_bar(stat = "identity") +
+#No statistical difference between income gap between men and women in urban and rural environments
+#There is a larger spread in income difference for rural communities, which may be a function
+#of a generally smaller population of people who identify as being in a rural residence
+
+ggplot(subset(gap.data.residence, residence %in% c("RURAL", "URBAN")), 
+       aes(x=residence, y=income.gap, fill=I("steelblue"))) + geom_bar(stat = "identity") +
+  geom_errorbar(aes(ymin = lower, ymax = upper), width = 0.1, position = position_dodge(0.9)) +
   xlab("Location of Residence") +
   ylab("Income Gap($)") +
   ggtitle("Income Gap between Men and Women, by Residence Location") +
   guides(fill = FALSE)
+
 ```
 
 ###Data Exploration
@@ -476,6 +527,10 @@ batch.two.var.names <-c("cocaine_use", "smokes", "drinks", "first.incarceration"
 
 batch.three.var.names <-c("first.incarceration", "CV_BIO_MOM_AGE_YOUTH_1997")
 
+batch.four.var.names <- c("HHIC_1997","CV_BIO_MOM_AGE_YOUTH_1997","num.parent", "CV_BIO_CHILD_HH_2007" )
+
+batch.five.var.names <- c("HHIC_1997","CV_BIO_MOM_AGE_YOUTH_1997", "residence","bio.status", "CV_BIO_CHILD_HH_2007" )
+
 #income.vars <- c("sex","race","marital_status","emp.industry","residence")
 
 #USE SOMETHING LIKE THIS... ONLY test for colinearity between variables that seem like they would be colinear
@@ -495,12 +550,11 @@ batch.three.var.names <-c("first.incarceration", "CV_BIO_MOM_AGE_YOUTH_1997")
 # # Use panel.cor to display correlations in lower panel.
 # pairs(nlsy[,income.vars], lower.panel = panel.cor)
 
-
-ggpairs(nlsy[,c(batch.two.var.names)], axisLabels = "internal", cardinality_threshold = 20)
-
-ggpairs(nlsy[,c(batch.one.var.names)], axisLabels = "internal", cardinality_threshold = 20)
-
 ggpairs(nlsy[,c(batch.three.var.names)], axisLabels = "internal", cardinality_threshold = 20)
+
+ggpairs(nlsy[,c(batch.four.var.names)], axisLabels = "internal", cardinality_threshold = 20)
+
+ggpairs(nlsy[,c(batch.five.var.names)], axisLabels = "internal", cardinality_threshold = 20)
 
 ```
 
