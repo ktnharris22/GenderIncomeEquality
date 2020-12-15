@@ -118,12 +118,12 @@ colnames(nlsy) <- c("PSTRAN_GPA.01_PSTR",
 
 ## 1a. Data Processing
 
-Create new variable columns for: \n
-    - Employment Industry (emp.industry)
-    - Income Levels for 1997 Based on Income Data (income.level_1997)
-    - Encarceration History (ever.incarcerated)
-    - Biological Relationship of Home Parental Figure (bio.status)
-    - Number of Parents within Home (num.parent)
+Create new variable columns for: <br />
+    - Employment Industry (emp.industry) <br />
+    - Income Levels for 1997 Based on Income Data (income.level_1997) <br />
+    - Encarceration History (ever.incarcerated) <br />
+    - Biological Relationship of Home Parental Figure (bio.status) <br />
+    - Number of Parents within Home (num.parent) <br />
 
 Recode a number of preexisting columns to better support analysis
 
@@ -501,6 +501,83 @@ ggplot(data = nlsy, aes(x=first.incarceration, y=income, colour = sex, shape = s
 
 ```
 
+```{r}
+#Average net worth of household in 1997 by gender as reported by parent
+#Data Clean to Remove Top Coding
+# - top-coding for the purpose of this analysis does not provide meaningful
+# information in understanding trends.  If anything it skewes the data in undescipherable ways
+nlsy.filtered <- filter(nlsy,HHIC_1997 < 600000 & income < 200000 & !is.na(nlsy$sex))
+income.data.HHIC1997 <- nlsy.filtered %>%
+  group_by(sex) %>%
+  summarize("avg.HHIC_1997" = mean(HHIC_1997, na.rm = TRUE),
+            'lower' = t.test(HHIC_1997, mu = mean(HHIC_1997, na.rm = TRUE))$conf.int[1],
+            'upper' = t.test(HHIC_1997, mu = mean(HHIC_1997,na.rm = TRUE))$conf.int[2])
+ggplot(data = income.data.HHIC1997, aes(x=sex, y=avg.HHIC_1997, fill=I("steelblue"))) + 
+  geom_bar(stat = "identity") +
+  geom_errorbar(aes(ymin = lower, ymax = upper), width = 0.1, position = position_dodge(0.9)) +
+  xlab("Gender") +
+  ylab("AVG Household Net Worth 1997") +
+  ggtitle("AVG Household Net Worth 1997 of Men and Women (According to Parent)") +
+  guides(fill = FALSE) 
+#No statistically significant difference in average houshold net worth between men and women
+#you see a less of a range between 150K and mx income which is interesting, there is not gradient like with 
+#Percentage of high earning men is clearly greater
+ggplot(data = nlsy.filtered, aes(x=HHIC_1997, y=income, colour = sex, shape = sex))+
+  geom_point(alpha = 0.3)
+#No significant difference in HHIC_1997 between men and women
+#amongst the same demographic, but you do observie a significant right tale:
+#the data is not normally distributed, which shows that white individuals
+#have HHIC_1997 > than other groups
+ggplot(data = nlsy.filtered, aes(x=HHIC_1997)) +
+  geom_density(alpha = 0.5, aes(fill = sex))
+#Investigation on Incarceration
+nlsy.filtered <- filter(nlsy, income < 200000 & !is.na(nlsy$sex))
+incarceration.age.data <- nlsy %>%
+  group_by(sex) %>%
+  summarize("avg.firstincarcerate" = mean(first.incarceration, na.rm = TRUE),
+            'lower' = t.test(first.incarceration, mu = mean(first.incarceration, na.rm = TRUE))$conf.int[1],
+            'upper' = t.test(first.incarceration, mu = mean(first.incarceration,na.rm = TRUE))$conf.int[2])
+ggplot(data = incarceration.age.data, aes(x=sex, y=avg.firstincarcerate, fill=I("steelblue"))) + 
+  geom_bar(stat = "identity") +
+  geom_errorbar(aes(ymin = lower, ymax = upper), width = 0.1, position = position_dodge(0.9)) +
+  xlab("Gender") +
+  ylab("Average Age of Incarceration") +
+  ggtitle("Average Age of Incarceration (According to Gender)") +
+  guides(fill = FALSE) 
+#Men on average have a slightly higher average incarceration age than women.
+#Data potentially look statistically significant.
+#Output table to test whether odds of having above zero income for previously incarcerated women \
+# is lower than previously incarcerated men 
+incarceration.income.table <- filter(nlsy, nlsy$ever.incarcerated == 'YES') %>%
+  mutate(non.zincome = case_when(income <=0 ~ "NO", income >0 ~ "YES"))
+incarceration.income.table <- with(incarceration.income.table, table(non.zincome, sex))
+kable(incarceration.income.table)
+#The odds of making non-zero income for men who have been incarcerated
+# is 1.43266 higher than for incarerated women.
+incarceration.fisher.test <- fisher.test(incarceration.income.table)
+#Data seems conglomerated around specific age ranges
+#Not enough women incarcerated
+#Does look like income is not as high for those incarcerated.
+#A lot of zero incomes for incarceration at any age
+ggplot(data = nlsy, aes(x=first.incarceration, y=income, colour = sex, shape = sex))+
+  geom_point(alpha = 0.3)
+##Residence: URban and Rural
+gap.data.residence <- nlsy %>%
+  group_by(residence) %>%
+  summarize(income.gap = (mean(income[sex == "MALE"], na.rm = TRUE) - mean(income[sex == "FEMALE"], na.rm = TRUE)),
+              'lower' = t.test(income ~ sex)$conf.int[1],
+              'upper' = t.test(income ~ sex)$conf.int[2])
+#No statistical difference between income gap between men and women in urban and rural environments
+#There is a larger spread in income difference for rural communities, which may be a function
+#of a generally smaller population of people who identify as being in a rural residence
+ggplot(subset(gap.data.residence, residence %in% c("RURAL", "URBAN")), 
+       aes(x=residence, y=income.gap, fill=I("steelblue"))) + geom_bar(stat = "identity") +
+  geom_errorbar(aes(ymin = lower, ymax = upper), width = 0.1, position = position_dodge(0.9)) +
+  xlab("Location of Residence") +
+  ylab("Income Gap($)") +
+  ggtitle("Income Gap between Men and Women, by Residence Location") +
+  guides(fill = FALSE)
+```
 
 
 ```{r}
@@ -619,17 +696,16 @@ lm.sex.mar_stat <- lm(income ~ sex*marital_status, data = nlsy)
 kable(coef(summary(lm.sex.mar_stat)), digits = c(0, 0, 2, 4))
 
 lm.race.sex.residence <-lm(income ~ sex*race*residence, data = nlsy)
-kable(coef(summary(lm.race.sex.residence)), digits = c(0, 0, 2, 4))
+#kable(coef(summary(lm.race.sex.residence)), digits = c(0, 0, 2, 4))
 
-###The most significant out of the bunch
 lm.race.sex.mar_stat <- lm(income ~ sex*race*marital_status, data = nlsy)
-kable(coef(summary(lm.race.sex.mar_stat)), digits = c(0, 0, 2, 4))
+#kable(coef(summary(lm.race.sex.mar_stat)), digits = c(0, 0, 2, 4))
 
 lm.race.sex.industry <- lm(income ~ sex*race*emp.industry, data = nlsy)
-kable(coef(summary(lm.race.sex.industry)), digits = c(0, 0, 2, 4))
+#kable(coef(summary(lm.race.sex.industry)), digits = c(0, 0, 2, 4))
 
 lm.race.sex.mar_stat.industry <- lm(income ~ sex*race*marital_status*emp.industry, data = nlsy)
-kable(coef(summary(lm.race.sex.mar_stat.industry)), digits = c(0, 0, 2, 4))
+#kable(coef(summary(lm.race.sex.mar_stat.industry)), digits = c(0, 0, 2, 4))
 
 anova(lm.sex, lm.race.sex, lm.sex.mar_stat, lm.race.sex.mar_stat, lm.race.sex.residence, lm.race.sex.industry, lm.race.sex.mar_stat.industry)
 
