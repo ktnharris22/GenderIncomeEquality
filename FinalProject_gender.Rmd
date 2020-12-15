@@ -243,19 +243,18 @@ ggplot(data = income.data.gender, aes(x=sex, y=avg.income, fill=I("steelblue")))
     - We identified at least two key variables for each major category, which we
     felt to have a high chance of influence income outcomes between gender
 
-Demographic Information:
+### Demographic Information:
 ```{r, echo=FALSE}
 kable(table(nlsy$sex), col.names = c("Gender Designation", "Count"))
 kable(table(nlsy$race), col.names = c("Race Designation", "Count"))
 ```
 
-Geographical Information:
+### Geographical Information:
 ```{r, echo=FALSE}
 kable(table(nlsy$emp.industry), col.names = c("Industry", "Count"))
-kable(table(nlsy$residence), col.names = c("Location of Home", "Count"))
 ```
 
-#### Key Question: Does the gender wage gap persist over industries? Does it increase or decrease according to industry?
+### Key Question: Does the gender wage gap persist over industries? Does it increase or decrease according to industry?
 ```{r, echo = FALSE}
 nlsy.no.military <- subset(nlsy, emp.industry!="ACTIVE DUTY MILITARY")
 
@@ -278,48 +277,176 @@ ggplot(data = gap.data.gender.industry,aes(x=emp.industry, y=income.gap, fill=is
 ```
 <font color="#157515"><b>
 
-Persistently statistically significant wage gap between men and women even across most industries, with Agriculture/Forestry/Fishing and Finance/Insurance/Real Estate having the largest wage gap. Because there are large differences in the wage gaps betindustries we will include it in our model. 
+>Persistently statistically significant wage gap between men and women even across most industries, with Agriculture/Forestry/Fishing and Finance/Insurance/Real Estate having the largest wage gap. Because there are large differences in the wage gaps betindustries we will include it in our model. 
 
 NOTE: we removed active duty military because there were no women in the survey and could not calculate a wage gap
 
 </font></b>
 
-#### Key Question: Does the gender wage gap persist accross location of residence?
-```{r}
+```{r, echo=FALSE}
+kable(table(nlsy$emp.industry), col.names = c("Industry", "Count"))
+kable(table(nlsy$residence), col.names = c("Location of Home", "Count"))
+```
+
+### Key Question: Does the gender wage gap persist accross location of residence?
+```{r, echo = FALSE}
+
+##Residence: URban and Rural
 gap.data.residence <- nlsy %>%
   group_by(residence) %>%
- summarize(income.gap = mean(income[sex == "MALE"], na.rm = TRUE) -
-              mean(income[sex == "FEMALE"], na.rm = TRUE))
-
-### Residence (Urban, Rural, Unknown)
-ggplot(data = gap.data.residence, aes(x=residence, y=income.gap, fill=I("steelblue"))) + geom_bar(stat = "identity") +
+  summarize(income.gap = (mean(income[sex == "MALE"], na.rm = TRUE) - mean(income[sex == "FEMALE"], na.rm = TRUE)),
+              'lower' = t.test(income ~ sex)$conf.int[1],
+              'upper' = t.test(income ~ sex)$conf.int[2])
+#No statistical difference between income gap between men and women in urban and rural environments
+#There is a larger spread in income difference for rural communities, which may be a function
+#of a generally smaller population of people who identify as being in a rural residence
+ggplot(subset(gap.data.residence, residence %in% c("RURAL", "URBAN")), 
+       aes(x=residence, y=income.gap, fill=I("steelblue"))) + geom_bar(stat = "identity") +
+  geom_errorbar(aes(ymin = lower, ymax = upper), width = 0.1, position = position_dodge(0.9)) +
   xlab("Location of Residence") +
   ylab("Income Gap($)") +
   ggtitle("Income Gap between Men and Women, by Residence Location") +
   guides(fill = FALSE)
-```
 
-Home Dynamic Information:
+
+```
+<font color="#157515"><b>
+
+>There is not a statistically significant difference in income gap accross urban and rural regions, but it does appear that
+amongst people who live in rural areas the spread of the income gap is larger.  A potential influencing factor could be a larger
+disparity amongst types of jobs (and subsequently their respective salaries) in rural regions as compared to urban regions.
+
+</font></b>
+
+Home Demographics Information:
 ```{r, echo=FALSE}
-kable(table(nlsy$income.level_1997), col.names = c("Income Bracket", "Count"))
 kable(table(nlsy$marital_status), col.names = c("Marital  Status", "Count"))
 kable(table(nlsy$birth.mom.age), col.names = c("Age of Mother", "Count"))
 ```
-
-#Drug Use Information:
 ```{r, echo=FALSE}
-kable(table(nlsy$cocaine_use), col.names = c("Cocain Use Status", "Count"))
+kable(table(nlsy$income.level_1997), col.names = c("Income Bracket", "Count"))
+```
+
+```{r, echo=FALSE}
+#Average net worth of household in 1997 by gender as reported by parent
+
+#Filter top-coded data
+nlsy.filtered <- filter(nlsy,HHIC_1997 < 600000 & income < 200000 & !is.na(nlsy$sex))
+
+income.data.HHIC1997 <- nlsy.filtered %>%
+  group_by(sex) %>%
+  summarize("avg.HHIC_1997" = mean(HHIC_1997, na.rm = TRUE),
+            'lower' = t.test(HHIC_1997, mu = mean(HHIC_1997, na.rm = TRUE))$conf.int[1],
+            'upper' = t.test(HHIC_1997, mu = mean(HHIC_1997,na.rm = TRUE))$conf.int[2])
+
+ggplot(data = income.data.HHIC1997, aes(x=sex, y=avg.HHIC_1997, fill=I("steelblue"))) + 
+  geom_bar(stat = "identity") +
+  geom_errorbar(aes(ymin = lower, ymax = upper), width = 0.1, position = position_dodge(0.9)) +
+  xlab("Gender Designation") +
+  ylab("AVG Household Net Worth 1997") +
+  ggtitle("AVG Household Net Worth 1997 of Men and Women (According to Parent)") +
+  guides(fill = FALSE) 
+
+```
+
+<font color="#157515"><b>
+
+>There is not a statistically significant difference in average Household net worth between male and female children in 1997, which was an important check, given
+the known impact of living conditions on outomes for child success.
+
+NOTE: Top-coded data (net worth above $599,99.99) were eliminated in order to remove biased created by ungranular top-coding function .
+</font></b>
+
+
+
+```{r, echo=FALSE}
+
+#No significant difference in HHIC_1997 between men and women
+#amongst the same demographic, but you do observie a significant right tale:
+#the data is not normally distributed, which shows that white individuals
+#have HHIC_1997 > than other groups
+ggplot(data = nlsy.filtered, aes(x=HHIC_1997)) +
+  geom_density(alpha = 0.5, aes(fill = sex))
+
+```
+
+<font color="#157515"><b>
+
+>Further plotting of the household net worth data confirmed similar trends between male and female populations.  Plotting futher confirmed that net worth distributions amongst male and female children in 1997 are not normal.  Any further analysis utilizing this variable that assumes normalty will require close consideration and/or some form of transformation.
+
+</font></b>
+
+
+### Drug Use & Incarceration Information:
+```{r, echo=FALSE}
+kable(table(nlsy$cocaine_use), col.names = c("Cocaine Use Status", "Count"))
 kable(table(nlsy$smokes), col.names = c("Smoking Use Status", "Count"))
 kable(table(nlsy$drinks), col.names = c("Drinking Use Status", "Count"))
+```
+
+```{r, echo = FALSE}
+#Investigation on Incarceration
+nlsy.filtered <- filter(nlsy, income < 200000 & !is.na(nlsy$sex))
+incarceration.age.data <- nlsy %>%
+  group_by(sex) %>%
+  summarize("avg.firstincarcerate" = mean(first.incarceration, na.rm = TRUE),
+            'lower' = t.test(first.incarceration, mu = mean(first.incarceration, na.rm = TRUE))$conf.int[1],
+            'upper' = t.test(first.incarceration, mu = mean(first.incarceration,na.rm = TRUE))$conf.int[2])
+
+ggplot(data = incarceration.age.data, aes(x=sex, y=avg.firstincarcerate, fill=I("steelblue"))) + 
+  geom_bar(stat = "identity") +
+  geom_errorbar(aes(ymin = lower, ymax = upper), width = 0.1, position = position_dodge(0.9)) +
+  xlab("Gender") +
+  ylab("Average Age of Incarceration") +
+  ggtitle("Average Age of Incarceration (According to Gender)") +
+  guides(fill = FALSE)
+
+#Men on average have a slightly higher average incarceration age than women.
+#Data potentially look statistically significant.
+```
+
+```{r, echo = FALSE}
+
+#Data seems conglomerated around specific age ranges
+#Not enough women incarcerated
+#Does look like income is not as high for those incarcerated.
+#A lot of zero incomes for incarceration at any age
+ggplot(data = nlsy.filtered, aes(x=first.incarceration, y=income, colour = sex, shape = sex))+
+  geom_point(alpha = 0.3) +
+  xlab("Age at First Incarceration (yrs)") +
+  ylab("Income ($)") +
+  ggtitle("Income vs. Age of First Incarceration") +
+  guides(fill = FALSE)
+
+```
+
+```{r, echo = FALSE}
+
+#Output table to test whether odds of having above zero income for previously incarcerated women \
+# is lower than previously incarcerated men 
+incarceration.income.table <- filter(nlsy, nlsy$ever.incarcerated == 'YES') %>%
+  mutate(non.zincome = case_when(income <=0 ~ "NO", income >0 ~ "YES"))
+incarceration.income.table <- with(incarceration.income.table, table(non.zincome, sex))
+
+#The odds of making non-zero income for men who have been incarcerated
+# is 1.43266 higher than for incarerated women.
+incarceration.fisher.test <- fisher.test(incarceration.income.table)
+
 ```
 
 
 ## 2. Methodology
 ### What factors in particular play a role the gender wage gap?
-We chose to explore several subsets of data first before running a linear model to see if we could identify any interesting patterns.
+We chose to explore several subsets of data before running linear models.  
+Our intent was to identify any interesting patterns prior to running our analyses.
 
-We'll start with race and marital status since those values intuitively seemed like they would have an impact.
-#### Race and Marital Status
+We started with race and marital status and then furthered the analysis with a reassessment of 
+household net worth, and we concluded with incarceration data and income
+
+All of these variables seemed the most impactful from an intuitive perspective.
+
+### Race and Marital Status
+
 ```{r}
 gap.data.gender.race <- nlsy %>% 
   group_by(race) %>%
@@ -339,9 +466,12 @@ ggplot(data = gap.data.gender.race, aes(x=race, y=income.gap, fill=is.significan
     theme(axis.text.x=element_text(angle = -15, vjust = 0)) +
     geom_errorbar(aes(ymax = upper, ymin = lower), width = 0.1, size = 1)
 ```
-Income gap does persist over race but there is noticeable difference in the gaps.
+<font color="#157515"><b>
+
+>Income gap does persist over race but there is noticeable difference in the gaps.
 The wage gap is quite large and statistically significant for hispanic men and women and for non-black non-hispanic men and women. However, I would pause before concluding this test shows that wage gap between black men and women or mixed race men and women is insignificant. There might be some counfounding variables in the background. Black people do generally have lower wages than white people.
 
+</font></b>
 
 ```{r, echo = FALSE}
 nlsy.valid.mar_stat <- subset(nlsy, marital_status != "UNKNOWN")
@@ -363,13 +493,15 @@ ggplot(data = gap.data.marital_stat, aes(x=marital_status, y=income.gap, fill=is
   geom_errorbar(aes(ymax = upper, ymin = lower), width = 0.1, size = 1)
 
 ```
-The wage gap does persist over marital status. In particular, married men and women seem to have the largest disparity in incomes. This is not entirely surprising given that traditional gender roles are still adhered to any many parts of the country. If the man is going to be the only one earning an income then it would follow that there would be a large disparity in wages. It's worth noting we chose to subset the nlsy data to only include those whose marital status was known. We removed ```{r} sum(nlsy$marital_status == "UNKNOWN")``` from the original data set.
+<font color="#157515"><b>
+
+>The wage gap does persist over marital status. In particular, married men and women seem to have the largest disparity in incomes. This is not entirely surprising given that traditional gender roles are still adhered to any many parts of the country. If the man is going to be the only one earning an income then it would follow that there would be a large disparity in wages. It's worth noting we chose to subset the nlsy data to only include those whose marital status was known. We removed ```{r} sum(nlsy$marital_status == "UNKNOWN")``` from the original data set.
 
 These finding agree with our original intuition that race and marital status do have a significant effect on the gender wage gap. 
+</font></b>
 
-Next we'll explore if substance use has any effect on the wage gap. 
-#### Substance Use: Alcohol, Tobacco, Hard Drugs(Cocaine)
-```{r}
+### Substance Use: Alcohol, Tobacco, Hard Drugs(Cocaine)
+```{r, echo = FALSE}
 ### ALCOHOL, TOBACCO, HARD DRUGS(Cocaine)
 nlsy.valid_smokes <- subset(nlsy, smokes!= "UNKNOWN", select = c(income,sex, smokes))
 
@@ -427,222 +559,32 @@ ggplot(data = gap.data.gender.drinks, aes(x=drinks, y=income.gap, fill=is.signif
     geom_errorbar(aes(ymax = upper, ymin = lower), width = 0.1, size = 1)
 
 ```
-The statistically significant wage gap persists over those who drink, smoke, and do hard drugs. This suggests that substance use has no affect on the wage gap.
+<font color="#157515"><b>
+>The statistically significant wage gap persists over those who drink, smoke, and do hard drugs. This suggests that substance use has no affect on the wage gap.
 There is a noticeable difference in the wage gap between men and women who drink and don't drink is considerable but still not statistically significant given the error bars overlap. We will not include these variables in our linear model.
 
-Now We're going to explore 
-### Age at Incarceration and HHIC_1997
-```{r}
-#Average net worth of household in 1997 by gender as reported by parent
+</font></b>
 
-#Data Clean to Remove Top Coding
-# - top-coding for the purpose of this analysis does not provide meaningful
-# information in understanding trends.  If anything it skewes the data in undescipherable ways
-nlsy.filtered <- filter(nlsy,HHIC_1997 < 600000 & income < 200000 & !is.na(nlsy$sex))
-
-income.data.HHIC1997 <- nlsy.filtered %>%
-  group_by(sex) %>%
-  summarize("avg.HHIC_1997" = mean(HHIC_1997, na.rm = TRUE),
-            'lower' = t.test(HHIC_1997, mu = mean(HHIC_1997, na.rm = TRUE))$conf.int[1],
-            'upper' = t.test(HHIC_1997, mu = mean(HHIC_1997,na.rm = TRUE))$conf.int[2])
-
-ggplot(data = income.data.HHIC1997, aes(x=sex, y=avg.HHIC_1997, fill=I("steelblue"))) + 
-  geom_bar(stat = "identity") +
-  geom_errorbar(aes(ymin = lower, ymax = upper), width = 0.1, position = position_dodge(0.9)) +
-  xlab("Gender") +
-  ylab("AVG Household Net Worth 1997") +
-  ggtitle("AVG Household Net Worth 1997 of Men and Women (According to Parent)") +
-  guides(fill = FALSE) 
-
-#No statistically significant difference in average houshold net worth between men and women
+### Revisiting Houshold Income 
+```{r,  echo = FALSE}
+#No sttistically significant difference in average houshold net worth between men and women
 
 #you see a less of a range between 150K and mx income which is interesting, there is not gradient like with 
 #Percentage of high earning men is clearly greater
 ggplot(data = nlsy.filtered, aes(x=HHIC_1997, y=income, colour = sex, shape = sex))+
   geom_point(alpha = 0.3)
-
-#No significant difference in HHIC_1997 between men and women
-#amongst the same demographic, but you do observie a significant right tale:
-#the data is not normally distributed, which shows that white individuals
-#have HHIC_1997 > than other groups
-ggplot(data = nlsy.filtered, aes(x=HHIC_1997)) +
-  geom_density(alpha = 0.5, aes(fill = sex))
-
-income.data.fincarcerate <- nlsy %>%
-  group_by(sex) %>%
-  summarize("avg.firstincarcerate" = mean(first.incarceration, na.rm = TRUE),
-            'lower' = t.test(first.incarceration, mu = mean(first.incarceration, na.rm = TRUE))$conf.int[1],
-            'upper' = t.test(first.incarceration, mu = mean(first.incarceration,na.rm = TRUE))$conf.int[2])
-
-income.data.fincarcerate
-
-#Output table regarding count of indv. with zero incomes as a funciton of incarceration status & gender
-
-nlsy.incarcerate <- nlsy %>%
-  mutate(INCARC_TOTNUM_XRND = case_when(INCARC_TOTNUM_XRND ==0 ~ "NO", first.incarceration >0 ~ "YES"))
-
-
-#Jaih to work on this and do a proportionality test to help support findings
-
-income.data.fincarcerate.prop <- nlsy.incarcerate %>%
-  group_by(sex,INCARC_TOTNUM_XRND) %>%
-  summarize("# Zero Income" = sum(income <= 0, na.rm = TRUE),
-            "# Above Zero Income" = sum(income > 0, na.rm = TRUE))
-
-income.data.fincarcerate.prop <- income.data.fincarcerate.prop[!is.na(income.data.fincarcerate.prop$INCARC_TOTNUM_XRND) &
-                                                                 income.data.fincarcerate.prop$INCARC_TOTNUM_XRND == "YES" ,]
-
-#Data seems conglomerated around specific age ranges
-#Not enough women incarcerated
-#Does look like income is not as high for those incarcerated.
-#A lot of zero incomes for incarceration at any age
-ggplot(data = nlsy, aes(x=first.incarceration, y=income, colour = sex, shape = sex))+
-  geom_point(alpha = 0.3)
-
 ```
 
-```{r}
-#Average net worth of household in 1997 by gender as reported by parent
-#Data Clean to Remove Top Coding
-# - top-coding for the purpose of this analysis does not provide meaningful
-# information in understanding trends.  If anything it skewes the data in undescipherable ways
-nlsy.filtered <- filter(nlsy,HHIC_1997 < 600000 & income < 200000 & !is.na(nlsy$sex))
-income.data.HHIC1997 <- nlsy.filtered %>%
-  group_by(sex) %>%
-  summarize("avg.HHIC_1997" = mean(HHIC_1997, na.rm = TRUE),
-            'lower' = t.test(HHIC_1997, mu = mean(HHIC_1997, na.rm = TRUE))$conf.int[1],
-            'upper' = t.test(HHIC_1997, mu = mean(HHIC_1997,na.rm = TRUE))$conf.int[2])
-ggplot(data = income.data.HHIC1997, aes(x=sex, y=avg.HHIC_1997, fill=I("steelblue"))) + 
-  geom_bar(stat = "identity") +
-  geom_errorbar(aes(ymin = lower, ymax = upper), width = 0.1, position = position_dodge(0.9)) +
-  xlab("Gender") +
-  ylab("AVG Household Net Worth 1997") +
-  ggtitle("AVG Household Net Worth 1997 of Men and Women (According to Parent)") +
-  guides(fill = FALSE) 
-#No statistically significant difference in average houshold net worth between men and women
-#you see a less of a range between 150K and mx income which is interesting, there is not gradient like with 
-#Percentage of high earning men is clearly greater
-ggplot(data = nlsy.filtered, aes(x=HHIC_1997, y=income, colour = sex, shape = sex))+
-  geom_point(alpha = 0.3)
-#No significant difference in HHIC_1997 between men and women
-#amongst the same demographic, but you do observie a significant right tale:
-#the data is not normally distributed, which shows that white individuals
-#have HHIC_1997 > than other groups
-ggplot(data = nlsy.filtered, aes(x=HHIC_1997)) +
-  geom_density(alpha = 0.5, aes(fill = sex))
-#Investigation on Incarceration
-nlsy.filtered <- filter(nlsy, income < 200000 & !is.na(nlsy$sex))
-incarceration.age.data <- nlsy %>%
-  group_by(sex) %>%
-  summarize("avg.firstincarcerate" = mean(first.incarceration, na.rm = TRUE),
-            'lower' = t.test(first.incarceration, mu = mean(first.incarceration, na.rm = TRUE))$conf.int[1],
-            'upper' = t.test(first.incarceration, mu = mean(first.incarceration,na.rm = TRUE))$conf.int[2])
-ggplot(data = incarceration.age.data, aes(x=sex, y=avg.firstincarcerate, fill=I("steelblue"))) + 
-  geom_bar(stat = "identity") +
-  geom_errorbar(aes(ymin = lower, ymax = upper), width = 0.1, position = position_dodge(0.9)) +
-  xlab("Gender") +
-  ylab("Average Age of Incarceration") +
-  ggtitle("Average Age of Incarceration (According to Gender)") +
-  guides(fill = FALSE) 
-#Men on average have a slightly higher average incarceration age than women.
-#Data potentially look statistically significant.
-#Output table to test whether odds of having above zero income for previously incarcerated women \
-# is lower than previously incarcerated men 
-incarceration.income.table <- filter(nlsy, nlsy$ever.incarcerated == 'YES') %>%
-  mutate(non.zincome = case_when(income <=0 ~ "NO", income >0 ~ "YES"))
-incarceration.income.table <- with(incarceration.income.table, table(non.zincome, sex))
-kable(incarceration.income.table)
-#The odds of making non-zero income for men who have been incarcerated
-# is 1.43266 higher than for incarerated women.
-incarceration.fisher.test <- fisher.test(incarceration.income.table)
-#Data seems conglomerated around specific age ranges
-#Not enough women incarcerated
-#Does look like income is not as high for those incarcerated.
-#A lot of zero incomes for incarceration at any age
-ggplot(data = nlsy, aes(x=first.incarceration, y=income, colour = sex, shape = sex))+
-  geom_point(alpha = 0.3)
-##Residence: URban and Rural
-gap.data.residence <- nlsy %>%
-  group_by(residence) %>%
-  summarize(income.gap = (mean(income[sex == "MALE"], na.rm = TRUE) - mean(income[sex == "FEMALE"], na.rm = TRUE)),
-              'lower' = t.test(income ~ sex)$conf.int[1],
-              'upper' = t.test(income ~ sex)$conf.int[2])
-#No statistical difference between income gap between men and women in urban and rural environments
-#There is a larger spread in income difference for rural communities, which may be a function
-#of a generally smaller population of people who identify as being in a rural residence
-ggplot(subset(gap.data.residence, residence %in% c("RURAL", "URBAN")), 
-       aes(x=residence, y=income.gap, fill=I("steelblue"))) + geom_bar(stat = "identity") +
-  geom_errorbar(aes(ymin = lower, ymax = upper), width = 0.1, position = position_dodge(0.9)) +
-  xlab("Location of Residence") +
-  ylab("Income Gap($)") +
-  ggtitle("Income Gap between Men and Women, by Residence Location") +
-  guides(fill = FALSE)
-```
+<font color="#157515"><b>
 
+>Plotting household networth against income shows a heavy clustering of data in the sub-$75000 income and sub- $200000 net worth region of the graph.
+This could appears to be more a function of the demographics of the population surveyed, given prior summary and the fact that a large range of incomes
+is can be associated with any an equally large range of household net worths.
 
-```{r}
+</font></b>
 
-#nlsy <- nlsy[nlsy$income > 0 & nlsy$income < 150000,] # only rows of people that make money within a certain range for income and housing. give justification
-
-#nlsy <- nlsy[nlsy$income == 0, ] # further investigation this population
-
-#ggplot(
-#       subset(gap.data.gender.industry, residence %in% c("RURAL", "URBAN")),
-#       aes(x=emp.industry, y=income.gap,fill=residence)) + 
-#  geom_bar(stat = "identity") +
-#  facet_grid(residence~.)+
-#  xlab("Industry") +
-#  ylab("Income Gap($)") +
-#  ggtitle("Income Gap between Men and Women, by Industry & Residence") +
-#  guides(fill = FALSE) +
-#  theme(axis.text.x=element_text(angle = -40, vjust = 0))
-```
-
-#### Collinearity Testing -12/12/20
-
-```{r}
-### COLINEARITY TESTS
-
-batch.one.var.names <-c("residence","emp.industry")
-
-batch.two.var.names <-c("cocaine_use", "smokes", "drinks", "first.incarceration")
-
-batch.three.var.names <-c("first.incarceration", "CV_BIO_MOM_AGE_YOUTH_1997")
-
-batch.four.var.names <- c("HHIC_1997","CV_BIO_MOM_AGE_YOUTH_1997","num.parent", "CV_BIO_CHILD_HH_2007" )
-
-batch.five.var.names <- c("HHIC_1997","CV_BIO_MOM_AGE_YOUTH_1997", "residence","bio.status", "CV_BIO_CHILD_HH_2007" )
-
-#income.vars <- c("sex","race","marital_status","emp.industry","residence")
-
-#USE SOMETHING LIKE THIS... ONLY test for colinearity between variables that seem like they would be colinear
-
-# Function taken from ?pairs Example section.  
-# panel.cor <- function(x, y, digits = 2, prefix = "", cex.cor, ...)
-# {
-#     usr <- par("usr"); on.exit(par(usr))
-#     par(usr = c(0, 1, 0, 1))
-#     r <- abs(cor(x, y))
-#     txt <- format(c(r, 0.123456789), digits = digits)[1]
-#     txt <- paste0(prefix, txt)
-#     if(missing(cex.cor)) cex.cor <- 0.8/strwidth(txt)
-#     text(0.5, 0.5, txt, cex = pmax(1, cex.cor * r))
-# }
-# 
-# # Use panel.cor to display correlations in lower panel.
-# pairs(nlsy[,income.vars], lower.panel = panel.cor)
-
-ggpairs(nlsy[,c(batch.three.var.names)], axisLabels = "internal", cardinality_threshold = 20)
-
-ggpairs(nlsy[,c(batch.four.var.names)], axisLabels = "internal", cardinality_threshold = 20)
-
-ggpairs(nlsy[,c(batch.five.var.names)], axisLabels = "internal", cardinality_threshold = 20)
-
-```
-
-Now we'll explore the relationship between mother's age when child is born and income
-
-#### Is there a relationship between age of mother and the wage gap?
+### Now we'll explore the relationship between mother's age when child is born and income
+    - Is there a relationship between age of mother and the wage gap?
 ```{r}
 nlsy.valid_mom_age <- subset(nlsy, CV_BIO_MOM_AGE_YOUTH_1997 < 55 & CV_BIO_MOM_AGE_YOUTH_1997 > 0)
 nlsy.valid_mom_age <- subset(nlsy.valid_mom_age, income < 200000)
@@ -681,6 +623,31 @@ ggplot(nlsy.valid_mom_age, aes(x = CV_BIO_MOM_AGE_YOUTH_1997,)) + xlab("Mother's
 
 ```
 Seemingly no from this data set. Birth mother's age is distributed similarly for every race.
+
+
+#### Collinearity Testing -12/12/20
+
+```{r, echo = FALSE}
+### COLINEARITY TESTS
+
+batch.one.var.names <-c("residence","emp.industry")
+
+batch.two.var.names <-c("cocaine_use", "smokes", "drinks", "first.incarceration")
+
+batch.three.var.names <-c("first.incarceration", "CV_BIO_MOM_AGE_YOUTH_1997")
+
+batch.four.var.names <- c("HHIC_1997","CV_BIO_MOM_AGE_YOUTH_1997","num.parent", "CV_BIO_CHILD_HH_2007" )
+
+batch.five.var.names <- c("HHIC_1997","CV_BIO_MOM_AGE_YOUTH_1997", "residence","bio.status", "CV_BIO_CHILD_HH_2007" )
+
+ggpairs(nlsy[,c(batch.three.var.names)], axisLabels = "internal", cardinality_threshold = 20)
+
+ggpairs(nlsy[,c(batch.four.var.names)], axisLabels = "internal", cardinality_threshold = 20)
+
+ggpairs(nlsy[,c(batch.five.var.names)], axisLabels = "internal", cardinality_threshold = 20)
+
+```
+
 
 ## 3. Findings
 ```{r, echo = FALSE}
