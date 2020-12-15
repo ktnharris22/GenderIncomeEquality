@@ -495,7 +495,7 @@ ggplot(data = gap.data.marital_stat, aes(x=marital_status, y=income.gap, fill=is
 ```
 <font color="#157515"><b>
 
->The wage gap does persist over marital status. In particular, married men and women seem to have the largest disparity in incomes. This is not entirely surprising given that traditional gender roles are still adhered to any many parts of the country. If the man is going to be the only one earning an income then it would follow that there would be a large disparity in wages. It's worth noting we chose to subset the nlsy data to only include those whose marital status was known. We removed ```{r} sum(nlsy$marital_status == "UNKNOWN")``` from the original data set.
+>The wage gap does persist over marital status. In particular, married men and women seem to have the largest disparity in incomes. It's worth noting we chose to subset the nlsy data to only include those whose marital status was known.  We removed `{r} sum(nlsy$marital_status == "UNKNOWN")` from the original data set.
 
 These finding agree with our original intuition that race and marital status do have a significant effect on the gender wage gap. 
 </font></b>
@@ -654,26 +654,42 @@ ggpairs(nlsy[,c(batch.five.var.names)], axisLabels = "internal", cardinality_thr
 ###LET'S RUN SOME REGRESSIONS
 
 lm.sex <- lm(income ~ sex, data = nlsy)
-kable(coef(summary(lm.sex)), digits = c(0, 0, 2, 4))
 
-lm.race.sex <- lm(income ~ sex*race, data = nlsy)
-kable(coef(summary(lm.race.sex)), digits = c(0, 0, 2, 4))
+lm.race.sex <- lm(income ~ sex + race + sex*race, data = nlsy)
 
-lm.sex.mar_stat <- lm(income ~ sex*marital_status, data = nlsy)
+lm.sex.mar_stat <- lm(income ~ sex + marital_status + sex*marital_status, data = nlsy)
 kable(coef(summary(lm.sex.mar_stat)), digits = c(0, 0, 2, 4))
 
-lm.race.sex.residence <-lm(income ~ sex*race*residence, data = nlsy)
-#kable(coef(summary(lm.race.sex.residence)), digits = c(0, 0, 2, 4))
+lm.sex.residence <-lm(income ~ sex + residence + sex*residence, data = nlsy)
 
-lm.race.sex.mar_stat <- lm(income ~ sex*race*marital_status, data = nlsy)
-#kable(coef(summary(lm.race.sex.mar_stat)), digits = c(0, 0, 2, 4))
+lm.sex.industry <- lm(income ~ sex*emp.industry, data = nlsy)
+kable(coef(summary(lm.race.sex.industry)), digits = c(0, 0, 2, 4))
 
-lm.race.sex.industry <- lm(income ~ sex*race*emp.industry, data = nlsy)
-#kable(coef(summary(lm.race.sex.industry)), digits = c(0, 0, 2, 4))
-
-lm.race.sex.mar_stat.industry <- lm(income ~ sex*race*marital_status*emp.industry, data = nlsy)
-#kable(coef(summary(lm.race.sex.mar_stat.industry)), digits = c(0, 0, 2, 4))
-
-anova(lm.sex, lm.race.sex, lm.sex.mar_stat, lm.race.sex.mar_stat, lm.race.sex.residence, lm.race.sex.industry, lm.race.sex.mar_stat.industry)
-
+anova(lm.sex, lm.race.sex)
+anova(lm.sex, lm.sex.mar_stat)
+anova(lm.sex, lm.sex.residence)
+anova(lm.sex, lm.sex.industry)
 ```
+From this ANOVA analysis we can see that marital status and industry of employment are the biggest factors in the wage gap between men and women. 
+
+Specifically marital status has the largest F-score at 299.29 with a p-value below .0001 suggesting that marital status is a highly significant factor when we discuss the gender wage gap. This is not surprising and follows what we saw earlier when we plotted the wage gap as a bar chart for different marital statuses.
+```{r, echo = FALSE}
+kable(coef(summary(lm.sex.mar_stat)), digits = c(0, 0, 2, 4))
+```
+Married men are expected to make on average almost 24,000 dollars more annually than married women. This is not entirely surprising given that traditional gender roles are still adhered to any many parts of the country. If the man is going to be the only one earning an income then it would follow that there would be a large disparity in wages. 
+
+In terms of industry as we saw previously there is some variance in the gender wage gaps between men and women across different industries. 
+```{r}
+kable(coef(summary(lm.sex.industry)), digits = c(0, 0, 2, 4))
+```
+The regression analysis predicts over a 10,000 difference in income for 13 of the 17 identified industries. This is a troubling number but it is important to remember that these categories are very wide, and that the model is not necessarily comparing men and women who are doing the same job or even a similar one. Therefore we cannot say that this wage gap across industries is  due to gender discrimination.
+
+### Diagnostic Plots
+```{r, echo=FALSE}
+plot(lm.sex.mar_stat)
+plot(lm.sex.industry)
+```
+
+These diagnostic plots expose some important underlying issues with both of our linear models. Notably the data is not normal and the data is being highly impacted by a few outliers. The residuals themselves though do not appear to have a pattern, suggesting that the linear model may not be entirely inappropriate. 
+
+### Discussion
