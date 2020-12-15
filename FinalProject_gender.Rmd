@@ -495,7 +495,7 @@ ggplot(data = gap.data.marital_stat, aes(x=marital_status, y=income.gap, fill=is
 ```
 <font color="#157515"><b>
 
->The wage gap does persist over marital status. In particular, married men and women seem to have the largest disparity in incomes. It's worth noting we chose to subset the nlsy data to only include those whose marital status was known.  We removed `{r} sum(nlsy$marital_status == "UNKNOWN")` from the original data set.
+>The wage gap does persist over marital status. In particular, married men and women seem to have the largest disparity in incomes. It's worth noting we chose to subset the nlsy data to only include those whose marital status was known.  We removed `r sum(nlsy$marital_status == "UNKNOWN")` from the original data set.
 
 These finding agree with our original intuition that race and marital status do have a significant effect on the gender wage gap. 
 </font></b>
@@ -662,8 +662,8 @@ kable(coef(summary(lm.sex.mar_stat)), digits = c(0, 0, 2, 4))
 
 lm.sex.residence <-lm(income ~ sex + residence + sex*residence, data = nlsy)
 
-lm.sex.industry <- lm(income ~ sex*emp.industry, data = nlsy)
-kable(coef(summary(lm.race.sex.industry)), digits = c(0, 0, 2, 4))
+lm.sex.industry <- lm(income ~ sex + emp.industry + sex*emp.industry, data = nlsy)
+kable(coef(summary(lm.sex.industry)), digits = c(0, 0, 2, 4))
 
 anova(lm.sex, lm.race.sex)
 anova(lm.sex, lm.sex.mar_stat)
@@ -693,4 +693,4 @@ plot(lm.sex.industry)
 These diagnostic plots expose some important underlying issues with both of our linear models. Notably the data is not normal and the data is being highly impacted by a few outliers. The residuals themselves though do not appear to have a pattern, suggesting that the linear model may not be entirely inappropriate. 
 
 ### Discussion
-We believe we have discovered some interesting patterns within our analysis of the gender wage gap. Our two linear models need further analysis before we would present it to anyone. The residual plots do show that our linear models are not entirely appropriate. Specifically we would like to do further analysis to see if there are confounding variable with marital status like unemployment or voluntary non labor participation for women. That being said we do believe that the relationship betwen marital status and income does intuitively have merit. Incomes are dependent on jobs, married women tend to work less than men because of societal norms so we should expect them to make less than men.
+We believe we have discovered some interesting patterns within our analysis of the gender wage gap. Our two linear models need further analysis before we would present it to anyone. The residual plots do show that our linear models are not entirely appropriate. Specifically we would like to do further analysis to see if there are confounding variable with marital status like unemployment or voluntary non labor participation for women. That being said we do believe that the relationship between marital status and income does intuitively have merit. Incomes are dependent on jobs, married women tend to work less than men because of societal norms so we should expect them to make less than men.
