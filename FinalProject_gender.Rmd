@@ -569,12 +569,13 @@ lm.race.sex <- lm(income ~ sex*race, data = nlsy)
 kable(coef(summary(lm.race.sex)), digits = c(0, 0, 2, 4))
 
 lm.sex.mar_stat <- lm(income ~ sex*marital_status, data = nlsy)
-kable(coef(summary(lm.race.sex.mar_stat)), digits = c(0, 0, 2, 4))
+kable(coef(summary(lm.sex.mar_stat)), digits = c(0, 0, 2, 4))
 
 lm.race.sex.residence <-lm(income ~ sex*race*residence, data = nlsy)
 kable(coef(summary(lm.race.sex.residence)), digits = c(0, 0, 2, 4))
 
 ###The most significant out of the bunch
+lm.race.sex.mar_stat <- lm(income ~ sex*race*marital_status, data = nlsy)
 kable(coef(summary(lm.race.sex.mar_stat)), digits = c(0, 0, 2, 4))
 
 lm.race.sex.industry <- lm(income ~ sex*race*emp.industry, data = nlsy)
