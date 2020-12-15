@@ -220,9 +220,8 @@ income.data.gender <- nlsy %>%
   group_by(sex) %>%
  summarize(avg.income = mean(income),
            upper = t.test(income)$conf.int[1],
-           lower = t.test(income)$conf.int[2]
-           )
-
+           lower = t.test(income)$conf.int[2])
+t.test.wage.gap
 ggplot(data = income.data.gender, aes(x=sex, y=avg.income, fill=I("steelblue"))) + geom_bar(stat = "identity") +
   xlab("Gender") +
   ylab("Income") +
@@ -251,8 +250,6 @@ kable(table(nlsy$sex), col.names = c("Gender Designation", "Count"))
 
 >The data is nearly evently split between genders.
 
-NOTE: we removed active duty military because there were no women in the survey and could not calculate a wage gap
-
 </font></b>
 ```{r, echo=FALSE}
 kable(table(nlsy$race), col.names = c("Race Designation", "Count"))
@@ -264,22 +261,6 @@ kable(table(nlsy$race), col.names = c("Race Designation", "Count"))
 are well over 1000, which indicates that for most analyses we should have sufficient data to make statistical inferences.
 Mixed-raced (non-hispanic) individuals are poorly represented in the data.  All considerations regarding this demographic should be closely considered, especially
 for subsets of data where N < 32.
-
-NOTE: we removed active duty military because there were no women in the survey and could not calculate a wage gap
-
-</font></b>
-
-### Geographical Information:
-```{r, echo=FALSE}
-kable(table(nlsy$emp.industry), col.names = c("Industry", "Count"))
-```
-
-<font color="#157515"><b>
-
->A significant portion of individuals are in "UNKNOWN" industries, reducing the overall quantity of discernable industries accross which do perform
-analyses.  A number of industries have < 100 participants, which may bode poorly for future analysis on this variable.
-
-NOTE: we removed active duty military because there were no women in the survey and could not calculate a wage gap
 
 </font></b>
 
@@ -312,9 +293,17 @@ NOTE: we removed active duty military because there were no women in the survey 
 
 </font></b>
 
+### Geographical Information:
 ```{r, echo=FALSE}
-kable(table(nlsy$residence), col.names = c("Location of Home", "Count"))
+kable(table(nlsy$emp.industry), col.names = c("Industry", "Count"))
 ```
+
+<font color="#157515"><b>
+
+>A significant portion of individuals are in "UNKNOWN" industries, reducing the overall quantity of discernable industries accross which do perform
+analyses.  A number of industries have < 100 participants, which may bode poorly for future analysis on this variable.
+
+</font></b>
 
 ### Key Question: Does the gender wage gap persist accross location of residence?
 ```{r, echo = FALSE}
@@ -338,6 +327,11 @@ ggplot(subset(gap.data.residence, residence %in% c("RURAL", "URBAN")),
 
 
 ```
+
+```{r, echo=FALSE}
+kable(table(nlsy$residence), col.names = c("Location of Home", "Count"))
+```
+
 <font color="#157515"><b>
 
 >There is not a statistically significant difference in income gap accross urban and rural regions, but it does appear that
@@ -350,9 +344,6 @@ disparity amongst types of jobs (and subsequently their respective salaries) in 
 ```{r, echo=FALSE}
 kable(table(nlsy$marital_status), col.names = c("Marital  Status", "Count"))
 kable(table(nlsy$birth.mom.age), col.names = c("Age of Mother", "Count"))
-```
-```{r, echo=FALSE}
-kable(table(nlsy$income.level_1997), col.names = c("Income Bracket", "Count"))
 ```
 
 <font color="#157515"><b>
@@ -383,6 +374,10 @@ ggplot(data = income.data.HHIC1997, aes(x=sex, y=avg.HHIC_1997, fill=I("steelblu
 
 ```
 
+```{r, echo=FALSE}
+kable(table(nlsy$income.level_1997), col.names = c("Income Bracket", "Count"))
+```
+
 <font color="#157515"><b>
 
 >There is not a statistically significant difference in average Household net worth between male and female children in 1997, which was an important check, given
@@ -390,8 +385,6 @@ the known impact of living conditions on outomes for child success.
 
 NOTE: Top-coded data (net worth above $599,99.99) were eliminated in order to remove biased created by ungranular top-coding function .
 </font></b>
-
-
 
 ```{r, echo=FALSE}
 
@@ -422,6 +415,12 @@ kable(table(nlsy$smokes), col.names = c("Smoking Use Status", "Count"))
 kable(table(nlsy$drinks), col.names = c("Drinking Use Status", "Count"))
 ```
 
+<font color="#157515"><b>
+
+>For all drug use variables we see a healthy number of people accounted for with unknowns under 2000 participants.
+
+</font></b>
+
 ```{r, echo = FALSE}
 #Investigation on Incarceration
 nlsy.filtered <- filter(nlsy, income < 200000 & !is.na(nlsy$sex))
@@ -442,6 +441,12 @@ ggplot(data = incarceration.age.data, aes(x=sex, y=avg.firstincarcerate, fill=I(
 #Men on average have a slightly higher average incarceration age than women.
 #Data potentially look statistically significant.
 ```
+
+<font color="#157515"><b>
+
+>Men on average have a statistically signficant higher average age of first incarceration than women.
+
+</font></b>
 
 ```{r, echo = FALSE}
 
@@ -472,20 +477,29 @@ incarceration.fisher.test <- fisher.test(incarceration.income.table)
 
 ```
 
+<font color="#157515"><b>
+
+>Men on average have a statistically signficant higher average age of first incarceration than women.  When we run
+a Fisher test to further investigate the impact of incarceration on income, we find that the odds that a man will
+make non-zero income if he has been incarcerated is `r round(1/incarceration.fisher.test$estimate,2)` times higher
+than for women.  This finding could potentially point to incarceration having a signif
+
+</font></b>
+
 
 ## 2. Methodology
 ### What factors in particular play a role the gender wage gap?
 We chose to explore several subsets of data before running linear models.  
 Our intent was to identify any interesting patterns prior to running our analyses.
 
-We started with race and marital status and then furthered the analysis with a reassessment of 
-household net worth, and we concluded with incarceration data and income
+We started with race and marital status and then furthered the analysis with a reassessment of substance use,
+household net worth, and we concluded with mother's age and income
 
 All of these variables seemed the most impactful from an intuitive perspective.
 
 ### Race and Marital Status
 
-```{r}
+```{r, echo=FALSE}
 gap.data.gender.race <- nlsy %>% 
   group_by(race) %>%
   summarize(income.gap = mean(income[sex == "MALE"], na.rm = TRUE) 
@@ -624,7 +638,7 @@ is can be associated with any an equally large range of household net worths.
 
 ### Now we'll explore the relationship between mother's age when child is born and income
     - Is there a relationship between age of mother and the wage gap?
-```{r}
+```{r, echo=FALSE}
 nlsy.valid_mom_age <- subset(nlsy, CV_BIO_MOM_AGE_YOUTH_1997 < 55 & CV_BIO_MOM_AGE_YOUTH_1997 > 0)
 nlsy.valid_mom_age <- subset(nlsy.valid_mom_age, income < 200000)
 
@@ -651,7 +665,11 @@ ggplot(data = gap.data.AGE_MOM_YOUTH, aes(x=birth.mom.age, y=income.gap, fill=I(
 ### Is mother's age at all associated with income?
 Intuitively, we would expect mother's age at birth of child to be positively correlated with income. Generally younger mother's have lower incomes.
 ```{r, echo = FALSE}
-plot.interact <- qplot(x = CV_BIO_MOM_AGE_YOUTH_1997, y = income, color = sex, data = nlsy.valid_mom_age) + stat_smooth(method = "lm", se = FALSE, fullrange = TRUE)
+plot.interact <- qplot(x = CV_BIO_MOM_AGE_YOUTH_1997, y = income, color = sex, data = nlsy.valid_mom_age) + 
+  stat_smooth(method = "lm", se = FALSE, fullrange = TRUE) +
+  xlab("Age of Mother at Birth of Child") +
+  ylab("Income ($)") +
+  ggtitle("Age of Mother at Birth vs. Income") 
 
 plot.interact
 
@@ -676,28 +694,23 @@ ggplot(nlsy.valid_mom_age, aes(x = CV_BIO_MOM_AGE_YOUTH_1997,)) + xlab("Mother's
 
 </font></b>
 
-### Collinearity Testing -12/12/20
+### Collinearity Testing:
 
 ```{r, echo = FALSE}
 ### COLINEARITY TESTS
 
-batch.one.var.names <-c("residence","emp.industry")
+batch.five.var.names <- c("HHIC_1997","CV_BIO_MOM_AGE_YOUTH_1997", "CV_BIO_CHILD_HH_2007", "marital_status")
 
-batch.two.var.names <-c("cocaine_use", "smokes", "drinks", "first.incarceration")
-
-batch.three.var.names <-c("first.incarceration", "CV_BIO_MOM_AGE_YOUTH_1997")
-
-batch.four.var.names <- c("HHIC_1997","CV_BIO_MOM_AGE_YOUTH_1997","num.parent", "CV_BIO_CHILD_HH_2007" )
-
-batch.five.var.names <- c("HHIC_1997","CV_BIO_MOM_AGE_YOUTH_1997", "residence","bio.status", "CV_BIO_CHILD_HH_2007" )
-
-ggpairs(nlsy[,c(batch.three.var.names)], axisLabels = "internal", cardinality_threshold = 20)
-
-ggpairs(nlsy[,c(batch.four.var.names)], axisLabels = "internal", cardinality_threshold = 20)
-
-ggpairs(nlsy[,c(batch.five.var.names)], axisLabels = "internal", cardinality_threshold = 20)
+ggpairs(nlsy[,c(batch.five.var.names)], axisLabels = "internal", cardinality_threshold = 15)
 
 ```
+
+<font color="#157515"><b>
+
+>None of the variables we presume to be the most interrelated or influential on the outcome of income per gender
+collinearity.  This gives us confidence in our intended selections for the regression analysis.
+
+</font></b>
 
 
 ## 3. Findings
@@ -705,43 +718,58 @@ ggpairs(nlsy[,c(batch.five.var.names)], axisLabels = "internal", cardinality_thr
 ###LET'S RUN SOME REGRESSIONS
 
 lm.sex <- lm(income ~ sex, data = nlsy)
-
 lm.race.sex <- lm(income ~ sex + race + sex*race, data = nlsy)
-
 lm.sex.mar_stat <- lm(income ~ sex + marital_status + sex*marital_status, data = nlsy)
-kable(coef(summary(lm.sex.mar_stat)), digits = c(0, 0, 2, 4))
-
 lm.sex.residence <-lm(income ~ sex + residence + sex*residence, data = nlsy)
-
 lm.sex.industry <- lm(income ~ sex + emp.industry + sex*emp.industry, data = nlsy)
-kable(coef(summary(lm.sex.industry)), digits = c(0, 0, 2, 4))
 
 anova(lm.sex, lm.race.sex)
 anova(lm.sex, lm.sex.mar_stat)
 anova(lm.sex, lm.sex.residence)
 anova(lm.sex, lm.sex.industry)
 ```
-From this ANOVA analysis we can see that marital status and industry of employment are the biggest factors in the wage gap between men and women. 
 
-Specifically marital status has the largest F-score at 299.29 with a p-value below .0001 suggesting that marital status is a highly significant factor when we discuss the gender wage gap. This is not surprising and follows what we saw earlier when we plotted the wage gap as a bar chart for different marital statuses.
+<font color="#157515"><b>
+
+>From this ANOVA analysis we can see that marital status and industry of employment are the biggest factors in the wage gap between men and women. 
+
+>Specifically marital status has the largest F-score at 299.29 with a p-value below .0001 suggesting that marital status is a highly significant factor when we discuss the gender wage gap. This is not surprising because it follows what we observed earlier when we plotted the wage gap as a bar chart for different marital statuses: married men and married women had the largest wage gap.
+
+</font></b>
+
+
 ```{r, echo = FALSE}
 kable(coef(summary(lm.sex.mar_stat)), digits = c(0, 0, 2, 4))
 ```
-Married men are expected to make on average almost 24,000 dollars more annually than married women. This is not entirely surprising given that traditional gender roles are still adhered to any many parts of the country. If the man is going to be the only one earning an income then it would follow that there would be a large disparity in wages. 
 
-In terms of industry as we saw previously there is some variance in the gender wage gaps between men and women across different industries. 
-```{r}
+<font color="#157515"><b>
+
+>Married men are expected to make on average almost 24,000 dollars more annually than married women. This is not entirely surprising given that traditional gender roles are still adhered to any many parts of the country. If the man is going to be the only one earning an income then it would follow that there would be a large disparity in wages. 
+
+>In terms of industry as we saw previously there is some variance in the gender wage gaps between men and women across different industries. 
+
+</font></b>
+
+```{r, echo = FALSE}
 kable(coef(summary(lm.sex.industry)), digits = c(0, 0, 2, 4))
 ```
-The regression analysis predicts over a 10,000 difference in income for 13 of the 17 identified industries. This is a troubling number but it is important to remember that these categories are very wide, and that the model is not necessarily comparing men and women who are doing the same job or even a similar one. Therefore we cannot say that this wage gap across industries is  due to gender discrimination.
+
+<font color="#157515"><b>
+
+>The regression analysis predicts over a 10,000 difference in income for 13 of the 17 identified industries. This is a troubling number but it is important to remember that these categories are very wide, and that the model is not necessarily comparing men and women who are doing the same job or even a similar one. Therefore we cannot say that this wage gap across industries is  due to gender discrimination.
+
+</font></b>
 
 ### Diagnostic Plots
 ```{r, echo=FALSE}
 plot(lm.sex.mar_stat)
 plot(lm.sex.industry)
 ```
+<font color="#157515"><b>
 
-These diagnostic plots expose some important underlying issues with both of our linear models. Notably the data is not normal and the data is being highly impacted by a few outliers. The residuals themselves though do not appear to have a pattern, suggesting that the linear model may not be entirely inappropriate. 
+>These diagnostic plots expose some important underlying issues with both of our linear models. Notably the data is not normal and the data is being highly impacted by a few outliers. The residuals themselves though do not appear to have a pattern, suggesting that the linear model may not be entirely inappropriate. 
+
+</font></b>
 
 ### Discussion
 We believe we have discovered some interesting patterns within our analysis of the gender wage gap. Our two linear models need further analysis before we would present it to anyone. The residual plots do show that our linear models are not entirely appropriate. Specifically we would like to do further analysis to see if there are confounding variable with marital status like unemployment or voluntary non labor participation for women. That being said we do believe that the relationship between marital status and income does intuitively have merit. Incomes are dependent on jobs, married women tend to work less than men because of societal norms so we should expect them to make less than men.
