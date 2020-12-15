@@ -240,19 +240,48 @@ ggplot(data = income.data.gender, aes(x=sex, y=avg.income, fill=I("steelblue")))
 </font></b>
 
 ### THE BASICS: Data Summary By Category
-    - We identified at least two key variables for each major category, which we
-    felt to have a high chance of influence income outcomes between gender
+We identified at least two key variables for each major category, which we
+felt to have a high chance of influence income outcomes between gender
 
 ### Demographic Information:
 ```{r, echo=FALSE}
 kable(table(nlsy$sex), col.names = c("Gender Designation", "Count"))
+```
+<font color="#157515"><b>
+
+>The data is nearly evently split between genders.
+
+NOTE: we removed active duty military because there were no women in the survey and could not calculate a wage gap
+
+</font></b>
+```{r, echo=FALSE}
 kable(table(nlsy$race), col.names = c("Race Designation", "Count"))
 ```
+
+<font color="#157515"><b>
+
+>The data is based towards  non-black/non-hispanic individuals, but the quantities for black and hispanic participants
+are well over 1000, which indicates that for most analyses we should have sufficient data to make statistical inferences.
+Mixed-raced (non-hispanic) individuals are poorly represented in the data.  All considerations regarding this demographic should be closely considered, especially
+for subsets of data where N < 32.
+
+NOTE: we removed active duty military because there were no women in the survey and could not calculate a wage gap
+
+</font></b>
 
 ### Geographical Information:
 ```{r, echo=FALSE}
 kable(table(nlsy$emp.industry), col.names = c("Industry", "Count"))
 ```
+
+<font color="#157515"><b>
+
+>A significant portion of individuals are in "UNKNOWN" industries, reducing the overall quantity of discernable industries accross which do perform
+analyses.  A number of industries have < 100 participants, which may bode poorly for future analysis on this variable.
+
+NOTE: we removed active duty military because there were no women in the survey and could not calculate a wage gap
+
+</font></b>
 
 ### Key Question: Does the gender wage gap persist over industries? Does it increase or decrease according to industry?
 ```{r, echo = FALSE}
@@ -284,7 +313,6 @@ NOTE: we removed active duty military because there were no women in the survey 
 </font></b>
 
 ```{r, echo=FALSE}
-kable(table(nlsy$emp.industry), col.names = c("Industry", "Count"))
 kable(table(nlsy$residence), col.names = c("Location of Home", "Count"))
 ```
 
@@ -318,7 +346,7 @@ disparity amongst types of jobs (and subsequently their respective salaries) in 
 
 </font></b>
 
-Home Demographics Information:
+### Home Demographics Information:
 ```{r, echo=FALSE}
 kable(table(nlsy$marital_status), col.names = c("Marital  Status", "Count"))
 kable(table(nlsy$birth.mom.age), col.names = c("Age of Mother", "Count"))
@@ -326,6 +354,12 @@ kable(table(nlsy$birth.mom.age), col.names = c("Age of Mother", "Count"))
 ```{r, echo=FALSE}
 kable(table(nlsy$income.level_1997), col.names = c("Income Bracket", "Count"))
 ```
+
+<font color="#157515"><b>
+
+>For both Marital Status and Income Bracket variables we see a healthy spread of participants, except  widowed and above 40 year old age brackets.
+
+</font></b>
 
 ```{r, echo=FALSE}
 #Average net worth of household in 1997 by gender as reported by parent
@@ -366,7 +400,11 @@ NOTE: Top-coded data (net worth above $599,99.99) were eliminated in order to re
 #the data is not normally distributed, which shows that white individuals
 #have HHIC_1997 > than other groups
 ggplot(data = nlsy.filtered, aes(x=HHIC_1997)) +
-  geom_density(alpha = 0.5, aes(fill = sex))
+  geom_density(alpha = 0.5, aes(fill = sex)) +
+  xlab("Household Net Worth 1997 ($)") +
+  ylab("Count") +
+  ggtitle("Density Plots of Household Net Worth per Gender") +
+  guides(fill = FALSE) 
 
 ```
 
@@ -495,9 +533,10 @@ ggplot(data = gap.data.marital_stat, aes(x=marital_status, y=income.gap, fill=is
 ```
 <font color="#157515"><b>
 
->The wage gap does persist over marital status. In particular, married men and women seem to have the largest disparity in incomes. This is not entirely surprising given that traditional gender roles are still adhered to any many parts of the country. If the man is going to be the only one earning an income then it would follow that there would be a large disparity in wages. It's worth noting we chose to subset the nlsy data to only include those whose marital status was known. We removed ```{r} sum(nlsy$marital_status == "UNKNOWN")``` from the original data set.
+>The wage gap does persist over marital status. In particular, married men and women seem to have the largest disparity in incomes. This is not entirely surprising given that traditional gender roles are still adhered to any many parts of the country. If the man is going to be the only one earning an income then it would follow that there would be a large disparity in wages. It's worth noting we chose to subset the nlsy data to only include those whose marital status was known. We removed from the original data set.
 
-These finding agree with our original intuition that race and marital status do have a significant effect on the gender wage gap. 
+>These finding agree with our original intuition that race and marital status do have a significant effect on the gender wage gap. 
+
 </font></b>
 
 ### Substance Use: Alcohol, Tobacco, Hard Drugs(Cocaine)
@@ -602,9 +641,14 @@ ggplot(data = gap.data.AGE_MOM_YOUTH, aes(x=birth.mom.age, y=income.gap, fill=I(
   ggtitle("Income Gap between Men and Women, by Age of Mother at Birth") +
   guides(fill = FALSE)
 ```
-Here we see that the income gap persists over different age at birth categories of mother. Suggesting that age of birth mother does not have an effect on the wage gap.
 
-#### Is mother's age at all associated with income?
+<font color="#157515"><b>
+
+>Here we see that the income gap persists over different age at birth categories of mother. Suggesting that age of birth mother does not have an effect on the wage gap.
+
+</font></b>
+
+### Is mother's age at all associated with income?
 Intuitively, we would expect mother's age at birth of child to be positively correlated with income. Generally younger mother's have lower incomes.
 ```{r, echo = FALSE}
 plot.interact <- qplot(x = CV_BIO_MOM_AGE_YOUTH_1997, y = income, color = sex, data = nlsy.valid_mom_age) + stat_smooth(method = "lm", se = FALSE, fullrange = TRUE)
@@ -612,20 +656,27 @@ plot.interact <- qplot(x = CV_BIO_MOM_AGE_YOUTH_1997, y = income, color = sex, d
 plot.interact
 
 ```
+<font color="#157515"><b>
 
-Here we can see that mother's age when child was born is modestly positively correlated with income for both men and women. Because this positive correlation exists equally for men and women, it likely does not affect the income gap and we will not include it in our model.
+>Here we can see that mother's age when child was born is modestly positively correlated with income for both men and women. Because this positive correlation exists equally for men and women, it likely does not affect the income gap and we will not include it in our model.
 
 Note: we did subset the data in this case to remove rows if they had invalid or unknown values for age of mother when she gave birth. We also removed the top coded values of income to increase the accuracy of our model.
+
+</font></b>
 
 #### Is mother's age at all associated with race?
 ```{r, echo = FALSE}
 ggplot(nlsy.valid_mom_age, aes(x = CV_BIO_MOM_AGE_YOUTH_1997,)) + xlab("Mother's Age at Birth of Child") + geom_histogram(aes(fill = race))
 
 ```
-Seemingly no from this data set. Birth mother's age is distributed similarly for every race.
 
+<font color="#157515"><b>
 
-#### Collinearity Testing -12/12/20
+>Seemingly no from this data set. Birth mother's age is distributed similarly for every race.
+
+</font></b>
+
+### Collinearity Testing -12/12/20
 
 ```{r, echo = FALSE}
 ### COLINEARITY TESTS
